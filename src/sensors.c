@@ -35,7 +35,9 @@ void Sensors_Update(void)
 
 void Sensors_ReadToBuffer(uint16_t buffer[5])
 {
+    SysTick_DisableInterrupt();
     memcpy_v2n(buffer, currentValues, sizeof(currentValues));
+    SysTick_EnableInterrupt();
 }
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
@@ -44,7 +46,7 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 
     Sensors_ReadToBuffer(values);
     snprintf(out, TELEMETRY_STRING_SIZE,
-            "Sensors:\tLF:%d\tLS:%d\tF:%d\tRS:%d\tRF:%d\n",
+            "LF:%-5d\tLS:%-5d\tF:%-5d\tRS:%-5d\tRF:%-5d\n",
             values[0], values[1], values[4], values[2], values[3]);
 }
 

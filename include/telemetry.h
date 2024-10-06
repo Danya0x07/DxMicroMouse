@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define TELEMETRY_STRING_SIZE   64
+#define TELEMETRY_STRING_SIZE   80
 #define TELEMETRY_DEFAULT_INTERVAL  200
 
 struct TelemetryControlBlock {
