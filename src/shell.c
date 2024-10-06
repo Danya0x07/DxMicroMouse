@@ -54,6 +54,7 @@ static void HandleInput(void)
     char words[MAX_WORDS_NUM][MAX_WORD_LEN];
 
     UART_ReadLine(inputLine, sizeof(inputLine));
+    UART_Flush();
 
     int wordCount = ParseWords(inputLine, words, MAX_WORDS_NUM);
 

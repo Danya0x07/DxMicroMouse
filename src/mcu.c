@@ -279,7 +279,7 @@ static inline void initSPI(void)
     SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
     SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
     SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_32; // TODO
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128; // TODO
     SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
     SPI_InitStructure.SPI_CRCPolynomial = 7;
     SPI_Init(SPI2, &SPI_InitStructure);
@@ -313,7 +313,7 @@ static inline void initPFIC(void)
 {
     NVIC_InitTypeDef NVIC_InitStructure = {0};
 
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
 
     // BUTTON
     NVIC_InitStructure.NVIC_IRQChannel = EXTI1_IRQn;

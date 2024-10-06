@@ -8,11 +8,13 @@
 #include "fan.h"
 #include "sensors.h"
 #include "shell.h"
+#include "imu.h"
 
 static volatile bool btnFlag = 0;
 
 struct Module *modules[] = {
     &Sensors_module,
+    &IMU_module,
     NULL
 };
 
@@ -30,6 +32,8 @@ int main(void)
         printf("M95256 init failed: %d", retcode);
         Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
     }
+
+    IMU_Init();
 
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
 
@@ -51,6 +55,7 @@ void SysTick_Handler(void)
     SysTick->CTLR = 1;
 
     Sensors_Update();
+    IMU_Update();
 }
 
 __attribute__((interrupt("WCH-Interrupt-fast")))

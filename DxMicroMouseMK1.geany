@@ -21,37 +21,53 @@ indent_mode=2
 name=DxMicroMouseMK1
 base_path=/home/danya/Projects/MicroMouse/software/DxMicroMouseMK1
 description=
+file_patterns=
 
 [long line marker]
 long_line_behaviour=1
 long_line_column=80
 
 [files]
-current_page=1
-FILE_NAME_0=979;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fmain.c;0;4
-FILE_NAME_1=0;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fmcu.c;0;4
-FILE_NAME_2=1412;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fsensors.c;0;4
-FILE_NAME_3=0;C++;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Finclude%2Freceivers.h;0;4
-FILE_NAME_4=0;C++;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Finclude%2Femitters.h;0;4
-FILE_NAME_5=0;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Freceivers.c;0;4
-FILE_NAME_6=0;C++;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Finclude%2Fsensors.h;0;4
+current_page=8
+FILE_NAME_0=9701;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Flib%2Fmpu6500%2Fmpu6500.c;0;4
+FILE_NAME_1=685;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fmain.c;0;4
+FILE_NAME_2=0;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fbuzzer.c;0;4
+FILE_NAME_3=7995;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fmcu.c;0;4
+FILE_NAME_4=175;C++;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Finclude%2Fimu.h;0;4
+FILE_NAME_5=3581;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fimu.c;0;4
+FILE_NAME_6=1150;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fshell.c;0;4
+FILE_NAME_7=650;C;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Fsrc%2Fsensors.c;0;4
+FILE_NAME_8=6940;C++;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Flib%2Fmpu6500%2Fmpu6500.h;0;4
+FILE_NAME_9=223;C++;0;EUTF-8;0;1;0;%2Fhome%2Fdanya%2FProjects%2FMicroMouse%2Fsoftware%2FDxMicroMouseMK1%2Flib%2Fmpu6500%2Fmpu6500_conf.h;0;4
 
 [VTE]
 last_dir=/home/danya/Projects/MicroMouse/software/DxMicroMouseMK1
-
-[debugger]
-target=
-debugger=
-arguments=
-envvar_count=0
-watches_count=0
-breaks_count=0
 
 [prjorg]
 source_patterns=*.c;*.C;*.cpp;*.cxx;*.c++;*.cc;*.m;
 header_patterns=*.h;*.H;*.hpp;*.hxx;*.h++;*.hh;
 ignored_dirs_patterns=.*;CVS;
 ignored_file_patterns=*.o;*.obj;*.a;*.lib;*.so;*.dll;*.lo;*.la;*.class;*.jar;*.pyc;*.mo;*.gmo;
-generate_tag_prefs=0
+generate_tag_prefs=1
 show_empty_dirs=true
-external_dirs=/home/danya/.platformio/packages/framework-wch-noneos-sdk/Core/ch32v10x;/home/danya/.platformio/packages/framework-wch-noneos-sdk/Debug/ch32v10x;/home/danya/.platformio/packages/framework-wch-noneos-sdk/Peripheral/ch32v10x;/home/danya/.platformio/packages/framework-wch-noneos-sdk/System/ch32v10x;/home/danya/.platformio/platforms/ch32v/examples;
+external_dirs=/home/danya/.platformio/packages/framework-wch-noneos-sdk/Core/ch32v10x;/home/danya/.platformio/packages/framework-wch-noneos-sdk/Debug/ch32v10x;/home/danya/.platformio/packages/framework-wch-noneos-sdk/Peripheral/ch32v10x;/home/danya/.platformio/packages/framework-wch-noneos-sdk/System/ch32v10x;
+
+[build-menu]
+EX_00_LB=Upload
+EX_00_CM=pio run -t upload
+EX_00_WD=%p
+C++FT_00_LB=Clean
+C++FT_00_CM=pio run -t clean
+C++FT_00_WD=%p
+C++FT_01_LB=_Build
+C++FT_01_CM=pio run
+C++FT_01_WD=%p
+filetypes=C++;
+
+[debugger]
+target=
+debugger=GDB
+arguments=
+envvar_count=0
+watches_count=0
+breaks_count=0
