@@ -15,6 +15,7 @@ static volatile bool btnFlag = 0;
 struct Module *modules[] = {
     &Sensors_module,
     &IMU_module,
+    &Fan_module,
     NULL
 };
 

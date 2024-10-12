@@ -119,7 +119,12 @@ static inline void initGPIO(void)
     GPIO_Init(BUZZER_GPIO, &GPIO_InitStructure);
 
     // FAN
+#ifdef FAN_PWM
+    GPIO_PinRemapConfig(GPIO_PartialRemap_TIM3, ENABLE);
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
+#else
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+#endif
     GPIO_InitStructure.GPIO_Pin = FAN_PIN;
     GPIO_Init(MOTORS_GPIO, &GPIO_InitStructure);
 
@@ -228,6 +233,16 @@ static inline void initTimers(void)
     TIM_ARRPreloadConfig(TIM4, ENABLE);
     TIM_CtrlPWMOutputs(TIM4, ENABLE);
     TIM_Cmd(TIM4, ENABLE);
+
+#ifdef FAN_PWM
+    // Fan
+    TIM_TimeBaseInit(TIM3, &TIM_TimeBaseInitStructure);
+    TIM_OC1Init(TIM3, &TIM_OCInitStructure);
+    TIM_OC1PreloadConfig(TIM3, TIM_OCPreload_Disable);
+    TIM_ARRPreloadConfig(TIM3, ENABLE);
+    TIM_CtrlPWMOutputs(TIM3, ENABLE);
+    TIM_Cmd(TIM3, ENABLE);
+#endif
 
     // SysTick (interrupt every 1ms)
     SysTick->CTLR = 0;
