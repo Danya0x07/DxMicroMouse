@@ -40,7 +40,6 @@ void Fan_SetDuty(uint16_t duty)
 
 static int execute(int argc, char *argv[])
 {
-    atoi("135");
     if (argc != 1)
         return -1;
 

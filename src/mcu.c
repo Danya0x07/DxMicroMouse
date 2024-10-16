@@ -90,21 +90,36 @@ static inline void initGPIO(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Pin = MEM_CS_PIN;
     GPIO_Init(MEM_CS_GPIO, &GPIO_InitStructure);
+    GPIO_SetBits(MEM_CS_GPIO, MEM_CS_PIN);
 
     // MEM_HOLD
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Pin = MEM_HOLD_PIN;
     GPIO_Init(MEM_HOLD_GPIO, &GPIO_InitStructure);
+    GPIO_SetBits(MEM_HOLD_GPIO, MEM_HOLD_PIN);
 
     // IMU_CS
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Pin = IMU_CS_PIN;
     GPIO_Init(IMU_CS_GPIO, &GPIO_InitStructure);
+    GPIO_SetBits(IMU_CS_GPIO, IMU_CS_PIN);
 
     // IMU_INT
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_InitStructure.GPIO_Pin = IMU_INT_PIN;
     GPIO_Init(IMU_INT_GPIO, &GPIO_InitStructure);
+
+    // ENCL_CS
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Pin = ENCL_CS_PIN;
+    GPIO_Init(ENCL_CS_GPIO, &GPIO_InitStructure);
+    GPIO_SetBits(ENCL_CS_GPIO, ENCL_CS_PIN);
+
+    // ENCR_CS
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_Out_PP;
+    GPIO_InitStructure.GPIO_Pin = ENCR_CS_PIN;
+    GPIO_Init(ENCR_CS_GPIO, &GPIO_InitStructure);
+    GPIO_SetBits(ENCR_CS_GPIO, ENCR_CS_PIN);
 
     // BUTTON
     GPIO_InitStructure.GPIO_Pin = BUTTON_PIN;

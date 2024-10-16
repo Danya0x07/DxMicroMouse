@@ -31,6 +31,11 @@
 #define IMU_INT_GPIO    GPIOA
 #define IMU_INT_PIN     GPIO_Pin_8
 
+#define ENCL_CS_GPIO    GPIOA
+#define ENCL_CS_PIN     GPIO_Pin_12
+#define ENCR_CS_GPIO    GPIOC
+#define ENCR_CS_PIN     GPIO_Pin_14
+
 #define SPI_MOSI_GPIO   GPIOB
 #define SPI_MOSI_PIN    GPIO_Pin_15
 

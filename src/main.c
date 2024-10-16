@@ -9,6 +9,7 @@
 #include "sensors.h"
 #include "shell.h"
 #include "imu.h"
+#include "encoders.h"
 
 static volatile bool btnFlag = 0;
 
@@ -16,6 +17,7 @@ struct Module *modules[] = {
     &Sensors_module,
     &IMU_module,
     &Fan_module,
+    &Encoders_module,
     NULL
 };
 
@@ -30,7 +32,12 @@ int main(void)
     printf("Clock is: %ld\n\n", SystemCoreClock);
 
     if ((retcode = M95256_Init()) != 0) {
-        printf("M95256 init failed: %d", retcode);
+        printf("M95256 init failed: %d\n", retcode);
+        Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
+    }
+
+    if ((retcode = Encoders_Init()) != 0) {
+        printf("Encoders initialization failed: %d\n", retcode);
         Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
     }
 
@@ -55,8 +62,13 @@ void SysTick_Handler(void)
     SysTick->CNTL3 = 0;
     SysTick->CTLR = 1;
 
+    GPIO_ResetBits(MEM_HOLD_GPIO, MEM_HOLD_PIN);
+
     Sensors_Update();
+    Encoders_Update();
     IMU_Update();
+
+    GPIO_SetBits(MEM_HOLD_GPIO, MEM_HOLD_PIN);
 }
 
 __attribute__((interrupt("WCH-Interrupt-fast")))

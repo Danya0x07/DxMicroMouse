@@ -1,7 +1,7 @@
 #ifndef _INC_IMU_H
 #define _INC_IMU_H
 
-#include <module.h>
+#include "module.h"
 
 struct IMU_Data {
     int16_t accelX;
