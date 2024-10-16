@@ -12,7 +12,7 @@ struct IMU_Data {
     int16_t gyroZ;
 };
 
-void IMU_Init(void);
+int IMU_Init(void);
 void IMU_Update(void);
 void IMU_GetData(struct IMU_Data *data);
 

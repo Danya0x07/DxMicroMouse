@@ -10,6 +10,7 @@
 #include "shell.h"
 #include "imu.h"
 #include "encoders.h"
+#include "memory.h"
 
 static volatile bool btnFlag = 0;
 
@@ -18,6 +19,7 @@ struct Module *modules[] = {
     &IMU_module,
     &Fan_module,
     &Encoders_module,
+    &Memory_module,
     NULL
 };
 
@@ -31,18 +33,25 @@ int main(void)
     printf("DxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
     printf("Clock is: %ld\n\n", SystemCoreClock);
 
-    if ((retcode = M95256_Init()) != 0) {
-        printf("M95256 init failed: %d\n", retcode);
+    if ((retcode = Memory_Init()) != 0) {
+        printf("Memory retcode: %d\n", retcode);
         Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
+        LED0_Blink(1, 200);
     }
 
     if ((retcode = Encoders_Init()) != 0) {
-        printf("Encoders initialization failed: %d\n", retcode);
+        printf("Encoders retcode: %d\n", retcode);
         Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
+        LED0_Blink(2, 200);
     }
 
-    IMU_Init();
+    if ((retcode = IMU_Init()) != 0) {
+        printf("IMU retcode: %d\n", retcode);
+        Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
+        LED0_Blink(3, 200);
+    }
 
+    printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
 
     for (;;) {

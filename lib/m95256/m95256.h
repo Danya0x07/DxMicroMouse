@@ -3,7 +3,7 @@
 #ifndef _DRIVERS_M95256_H
 #define _DRIVERS_M95256_H
 
-#include <ch32v10x.h>
+#include "mcu.h"
 
 #define M95_PAGE_SIZE   64
 

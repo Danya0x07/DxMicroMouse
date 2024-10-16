@@ -41,8 +41,10 @@ static const uint16_t mpu6500SelfTestTable[256] = {
 
 static volatile struct IMU_Data currentData;
 
-void IMU_Init(void)
+int IMU_Init(void)
 {
+    int retcode = 0;
+
     struct MPU6500_Configuration config = {
         .fifo = {
             .mode = MPU6500_FIFO_MODE_REPLACING,
@@ -86,6 +88,7 @@ void IMU_Init(void)
     uint8_t id;
     if ((id = MPU6500_ReadID()) != 0x70) {
         printf("MPU6500 ID mismatch: expected 0x70, got 0x%x\n", id);
+        retcode = -1;
     }
 
     MPU6500_Configure(&config);
@@ -166,6 +169,10 @@ void IMU_Init(void)
         changeGyroX, changeGyroY, changeGyroZ,
         changeAccelX, changeAccelY, changeAccelZ
     );
+    if (changeGyroX > 10 || changeGyroY > 10 || changeGyroZ > 10
+            || changeAccelX > 10 || changeAccelY > 10 || changeAccelZ > 10) {
+        retcode = -2;
+    }
 
     // Check offsets
     MPU6500_GetOffset(&sensorData);
@@ -201,6 +208,7 @@ void IMU_Init(void)
     };
 
     MPU6500_ConfigureInterrupt(&intConfig);
+    return retcode;
 }
 
 void IMU_Update(void)
