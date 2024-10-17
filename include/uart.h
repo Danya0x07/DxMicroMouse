@@ -5,7 +5,7 @@
 #include <stdbool.h>
 
 void UART_SendChar(char c);
-void UART_SendString(char *str);
+void UART_SendString(const char *str);
 char UART_ReadChar(void);
 bool UART_LineReceived(void);
 uint32_t UART_ReadLine(char *buff, uint32_t size);

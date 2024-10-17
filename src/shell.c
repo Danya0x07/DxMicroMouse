@@ -19,6 +19,21 @@ static void SendTelemetry(void)
     }
 }
 
+static void PrintModules(void)
+{
+    struct Module *m;
+
+    UART_SendString("Modules:\n");
+    FOR_EACH_MODULE(addr) {
+        m = *addr;
+        UART_SendString(m->name);
+        if (m->telemetry)
+            UART_SendChar('*');
+        UART_SendChar(' ');
+    }
+    UART_SendChar('\n');
+}
+
 static struct Module *FindModuleByName(const char *name)
 {
     struct Module *m;
@@ -73,7 +88,10 @@ static void HandleInput(void)
     struct Module *module = FindModuleByName(words[0]);
 
     if (!module) {
-        printf("No such module %s\n", words[0]);
+        if (!strcmp(words[0], "?"))
+            PrintModules();
+        else
+            printf("No such module %s\n", words[0]);
         return;
     }
 

@@ -17,6 +17,7 @@ static volatile bool btnFlag = 0;
 struct Module *modules[] = {
     &Sensors_module,
     &IMU_module,
+    &Motors_module,
     &Fan_module,
     &Encoders_module,
     &Memory_module,
@@ -71,13 +72,15 @@ void SysTick_Handler(void)
     SysTick->CNTL3 = 0;
     SysTick->CTLR = 1;
 
-    GPIO_ResetBits(MEM_HOLD_GPIO, MEM_HOLD_PIN);
+    MEMORY_HOLD_TRANSACTION();
 
     Sensors_Update();
     Encoders_Update();
     IMU_Update();
 
-    GPIO_SetBits(MEM_HOLD_GPIO, MEM_HOLD_PIN);
+    Motors_Update();
+
+    MEMORY_UNHOLD_TRANSACTION();
 }
 
 __attribute__((interrupt("WCH-Interrupt-fast")))

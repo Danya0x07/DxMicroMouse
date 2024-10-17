@@ -42,7 +42,7 @@ void UART_SendChar(char c)
     USART_SendData(USART1, c);
 }
 
-void UART_SendString(char *str)
+void UART_SendString(const char *str)
 {
     while (*str)
         UART_SendChar(*str++);
