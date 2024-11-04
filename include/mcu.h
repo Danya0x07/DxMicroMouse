@@ -108,8 +108,19 @@ static inline uint32_t Millis_Get(void)
 
 void Millis_Wait(uint32_t ms);
 
+static inline void SysTick_Reset(void)
+{
+    SysTick->CTLR = 0;
+    SysTick->CNTL0 = 0;
+    SysTick->CNTL1 = 0;
+    SysTick->CNTL2 = 0;
+    SysTick->CNTL3 = 0;
+    SysTick->CTLR = 1;
+}
+
 uint8_t SPI_TransferByte(uint8_t data);
 void SPI_TransferBytes(uint8_t *in, const uint8_t *out, uint16_t len);
+void SPI_SetSpeedToNormal(void);
 
 uint16_t ADC_Read(uint8_t ch);
 

@@ -308,7 +308,7 @@ static inline void initSPI(void)
     SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
     SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
     SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
-    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128; // TODO
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
     SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
     SPI_InitStructure.SPI_CRCPolynomial = 7;
     SPI_Init(SPI2, &SPI_InitStructure);
@@ -418,6 +418,25 @@ void SPI_TransferBytes(uint8_t *in, const uint8_t *out, uint16_t len)
     }
 }
 
+void SPI_SetSpeedToNormal(void)
+{
+    SPI_InitTypeDef  SPI_InitStructure = {0};
+
+    SPI_Cmd(SPI2, DISABLE);
+    SPI_InitStructure.SPI_Direction = SPI_Direction_2Lines_FullDuplex;
+    SPI_InitStructure.SPI_Mode = SPI_Mode_Master;
+    SPI_InitStructure.SPI_DataSize = SPI_DataSize_8b;
+    SPI_InitStructure.SPI_CPOL = SPI_CPOL_Low;
+    SPI_InitStructure.SPI_CPHA = SPI_CPHA_1Edge;
+    SPI_InitStructure.SPI_NSS = SPI_NSS_Soft;
+    SPI_InitStructure.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_8;
+    SPI_InitStructure.SPI_FirstBit = SPI_FirstBit_MSB;
+    SPI_InitStructure.SPI_CRCPolynomial = 7;
+    SPI_Init(SPI2, &SPI_InitStructure);
+
+    SPI_Cmd(SPI2, ENABLE);
+}
+
 static uint16_t CalcCalibrated(int16_t val)
 {
     if((val + adcCalibrationValue) < 0 || val == 0)
@@ -431,7 +450,7 @@ uint16_t ADC_Read(uint8_t ch)
 {
     uint16_t val;
 
-	ADC_RegularChannelConfig(ADC1, ch, 1, ADC_SampleTime_13Cycles5);
+	ADC_RegularChannelConfig(ADC1, ch, 1, ADC_SampleTime_28Cycles5);
 	ADC_SoftwareStartConvCmd(ADC1, ENABLE);
 
 	while(!ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC))

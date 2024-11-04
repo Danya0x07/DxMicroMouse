@@ -6,7 +6,7 @@
 
 void Fan_On(void)
 {
-    Fan_SetDuty(MOTOR_DUTY_MAX);
+    Fan_SetDuty(MOTOR_DUTY_MAX >> 1);
 }
 
 void Fan_Off(void)
@@ -20,6 +20,7 @@ void Fan_SetDuty(uint16_t duty)
 }
 
 #else
+#error "Fan motor is 4.2V maximum rated, we are using 8.4V maximum voltage."
 
 void Fan_On(void)
 {
@@ -44,7 +45,7 @@ static int execute(int argc, char *argv[])
         return -1;
 
     uint16_t duty = atoi(argv[0]);
-    if (duty <= MOTOR_DUTY_MAX) {
+    if (duty <= MOTOR_DUTY_MAX >> 1) {
         Fan_SetDuty(duty);
         return 0;
     }

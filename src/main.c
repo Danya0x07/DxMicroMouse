@@ -52,6 +52,7 @@ int main(void)
         LED0_Blink(3, 200);
     }
 
+    SPI_SetSpeedToNormal();
     printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
 
@@ -65,12 +66,7 @@ void SysTick_Handler(void)
 {
     MCU_millis++;
 
-    SysTick->CTLR = 0;
-    SysTick->CNTL0 = 0;
-    SysTick->CNTL1 = 0;
-    SysTick->CNTL2 = 0;
-    SysTick->CNTL3 = 0;
-    SysTick->CTLR = 1;
+    SysTick_Reset();
 
     MEMORY_HOLD_TRANSACTION();
 
