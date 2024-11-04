@@ -180,6 +180,11 @@ static inline void initGPIO(void)
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_InitStructure.GPIO_Pin = RECEIVER_F_PIN;
     GPIO_Init(RECEIVER_F_GPIO, &GPIO_InitStructure);
+
+    // Battery
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AIN;
+    GPIO_InitStructure.GPIO_Pin = BATTERY_PIN;
+    GPIO_Init(BATTERY_GPIO, &GPIO_InitStructure);
 }
 
 static inline void initEXTI(void)

@@ -79,6 +79,10 @@
 #define RECEIVER_RF_PIN     GPIO_Pin_1
 #define RECEIVER_RF_CH      ADC_Channel_1
 
+#define BATTERY_GPIO    GPIOA
+#define BATTERY_PIN     GPIO_Pin_0
+#define BATTERY_CH      ADC_Channel_0
+
 #define MOTOR_FREQ  100000
 #define MOTOR_DUTY_MAX    360
 

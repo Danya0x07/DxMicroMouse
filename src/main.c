@@ -11,6 +11,7 @@
 #include "imu.h"
 #include "encoders.h"
 #include "memory.h"
+#include "battery.h"
 
 static volatile bool btnFlag = 0;
 
@@ -21,6 +22,7 @@ struct Module *modules[] = {
     &Fan_module,
     &Encoders_module,
     &Memory_module,
+    &Battery_module,
     NULL
 };
 
@@ -73,6 +75,7 @@ void SysTick_Handler(void)
     Sensors_Update();
     Encoders_Update();
     IMU_Update();
+    Battery_Update();
 
     Motors_Update();
 
