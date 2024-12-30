@@ -74,24 +74,24 @@ void Encoders_Update(void)
 {
     int32_t ticksLeftPrev = prevData.ticksLeft;
     int32_t ticksRightPrev = prevData.ticksRight;
-    int32_t ticksLeft = AS5048_GetAngleRaw(AS5048_Handle_LEFT);
-    int32_t ticksRight = AS5048_GetAngleRaw(AS5048_Handle_RIGHT);
+    int32_t ticksLeft = AS5048_GetAngleRaw(AS5048_Handle_LEFT) >> 2;
+    int32_t ticksRight = AS5048_GetAngleRaw(AS5048_Handle_RIGHT) >> 2;
 
     int32_t delta = ticksLeft - ticksLeftPrev;
-    if (delta >= 0x1FFF || delta <= -0x1FFF) {
+    if (delta >= 0x07FF || delta <= -0x07FF) {
         if (delta < 0)
-            delta = (int32_t)0x3FFF - ticksLeftPrev + ticksLeft;
+            delta = (int32_t)0x0FFF - ticksLeftPrev + ticksLeft;
         else
-            delta = -((int32_t)0x3FFF - ticksLeft + ticksLeftPrev);
+            delta = -((int32_t)0x0FFF - ticksLeft + ticksLeftPrev);
     }
     currentData.ticksLeft += delta;
 
     delta = ticksRight - ticksRightPrev;
-    if (delta >= 0x1FFF || delta <= -0x1FFF) {
+    if (delta >= 0x07FF || delta <= -0x07FF) {
         if (delta < 0)
-            delta = (int32_t)0x3FFF - ticksRightPrev + ticksRight;
+            delta = (int32_t)0x0FFF - ticksRightPrev + ticksRight;
         else
-            delta = -((int32_t)0x3FFF - ticksRight + ticksRightPrev);
+            delta = -((int32_t)0x0FFF - ticksRight + ticksRightPrev);
     }
     currentData.ticksRight -= delta; // inverse delta for right encoder due to the way pcb is mounted
 

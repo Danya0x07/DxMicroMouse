@@ -51,12 +51,9 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     uint16_t values[5];
 
     Sensors_ReadToBuffer(values);
-    //~ snprintf(out, TELEMETRY_STRING_SIZE,
-            //~ "LF:%-5d\tLS:%-5d\tF:%-5d\tRS:%-5d\tRF:%-5d\n",
-            //~ values[0], values[1], values[4], values[2], values[3]);
     snprintf(out, TELEMETRY_STRING_SIZE,
-            "LS:%-5d\n",
-            values[1]);
+            "LF:%-5d\tLS:%-5d\tF:%-5d\tRS:%-5d\tRF:%-5d\n",
+            values[0], values[1], values[4], values[2], values[3]);
 }
 
 static struct TelemetryControlBlock telemetryControlBlock = {

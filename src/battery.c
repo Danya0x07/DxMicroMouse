@@ -46,7 +46,11 @@ BatteryStatus Battery_GetStatus(void)
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    snprintf(out, TELEMETRY_STRING_SIZE, "BATTERY:%d => %d\n", batteryLevel, Battery_GetStatus());
+    static const char *STATUS_TXT[] = {
+        "DEAD", "LOW", "MEDIUM", "HIGH", "FULL"
+    };
+
+    snprintf(out, TELEMETRY_STRING_SIZE, "BATTERY:%d => %s\n", batteryLevel, STATUS_TXT[Battery_GetStatus()]);
 }
 
 static struct TelemetryControlBlock telemetryControlBlock = {
