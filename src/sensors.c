@@ -1,10 +1,11 @@
 #include "sensors.h"
 #include "emitters.h"
 #include "receivers.h"
+#include <string.h>
 
 static volatile uint16_t currentValues[5];
 
-void Sensors_Update(void)
+static void update(void)
 {
     uint16_t rawValues[5] = {0};
 
@@ -13,11 +14,13 @@ void Sensors_Update(void)
     Micros_Wait(60);
     rawValues[ReceiverChannel_LeftFront] = Receivers_ReadChannel(ReceiverChannel_LeftFront);
     rawValues[ReceiverChannel_RightFront] = Receivers_ReadChannel(ReceiverChannel_RightFront);
+    rawValues[ReceiverChannel_Front] = Receivers_ReadChannel(ReceiverChannel_Front);
     Emitters_LeftFrontOff();
     Emitters_RightFrontOff();
     Micros_Wait(60);
     rawValues[ReceiverChannel_LeftFront] -= Receivers_ReadChannel(ReceiverChannel_LeftFront);
     rawValues[ReceiverChannel_RightFront] -= Receivers_ReadChannel(ReceiverChannel_RightFront);
+    rawValues[ReceiverChannel_Front] -= Receivers_ReadChannel(ReceiverChannel_Front);
 
     Emitters_LeftSideOn();
     Emitters_RightSideOn();
@@ -30,13 +33,31 @@ void Sensors_Update(void)
     rawValues[ReceiverChannel_LeftSide] -= Receivers_ReadChannel(ReceiverChannel_LeftSide);
     rawValues[ReceiverChannel_RightSide] -= Receivers_ReadChannel(ReceiverChannel_RightSide);
 
-    /*Emitters_FrontOn();
+    // processing rawValues
+
+    memcpy_n2v(currentValues, rawValues, sizeof(currentValues));
+}
+
+static void updateWithoutLightening(void)
+{
+    uint16_t rawValues[5] = {0};
+
+    rawValues[ReceiverChannel_LeftFront] = Receivers_ReadChannel(ReceiverChannel_LeftFront);
+    rawValues[ReceiverChannel_RightFront] = Receivers_ReadChannel(ReceiverChannel_RightFront);
+    rawValues[ReceiverChannel_LeftSide] = Receivers_ReadChannel(ReceiverChannel_LeftSide);
+    rawValues[ReceiverChannel_RightSide] = Receivers_ReadChannel(ReceiverChannel_RightSide);
     rawValues[ReceiverChannel_Front] = Receivers_ReadChannel(ReceiverChannel_Front);
-    Emitters_FrontOff();*/
 
     // processing rawValues
 
     memcpy_n2v(currentValues, rawValues, sizeof(currentValues));
+}
+
+void (*Sensors_Update)(void) = update;
+
+void Sensors_Setup(bool lighten)
+{
+    Sensors_Update = lighten ? update : updateWithoutLightening;
 }
 
 void Sensors_ReadToBuffer(uint16_t buffer[5])
@@ -56,6 +77,21 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
             values[0], values[1], values[4], values[2], values[3]);
 }
 
+static int execute(int argc, char *argv[])
+{
+    if (argc != 1)
+        return -1;
+
+    if (!strcmp(argv[0], "lon"))
+        Sensors_Update = update;
+    else if (!strcmp(argv[0], "loff"))
+        Sensors_Update = updateWithoutLightening;
+    else
+        return -2;
+
+    return 0;
+}
+
 static struct TelemetryControlBlock telemetryControlBlock = {
     .interval = 300,
     .write = WriteTelemetry
@@ -63,6 +99,6 @@ static struct TelemetryControlBlock telemetryControlBlock = {
 
 struct Module Sensors_module = {
     .name = "sensors",
-    .execute = NULL,
+    .execute = execute,
     .telemetry = &telemetryControlBlock
 };

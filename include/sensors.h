@@ -4,7 +4,8 @@
 #include "mcu.h"
 #include "module.h"
 
-void Sensors_Update(void);
+extern void (*Sensors_Update)(void);
+void Sensors_Setup(bool lighten);
 void Sensors_ReadToBuffer(uint16_t buffer[5]);
 
 extern struct Module Sensors_module;

@@ -177,7 +177,6 @@ static inline void initGPIO(void)
     GPIO_Init(RECEIVER_RS_GPIO, &GPIO_InitStructure);
     GPIO_InitStructure.GPIO_Pin = RECEIVER_RF_PIN;
     GPIO_Init(RECEIVER_RF_GPIO, &GPIO_InitStructure);
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
     GPIO_InitStructure.GPIO_Pin = RECEIVER_F_PIN;
     GPIO_Init(RECEIVER_F_GPIO, &GPIO_InitStructure);
 

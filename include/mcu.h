@@ -72,6 +72,7 @@
 #define RECEIVER_LS_CH      ADC_Channel_7
 #define RECEIVER_F_GPIO     GPIOA
 #define RECEIVER_F_PIN      GPIO_Pin_6
+#define RECEIVER_F_CH       ADC_Channel_6
 #define RECEIVER_RS_GPIO    GPIOA
 #define RECEIVER_RS_PIN     GPIO_Pin_4
 #define RECEIVER_RS_CH      ADC_Channel_4

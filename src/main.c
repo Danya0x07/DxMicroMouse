@@ -55,6 +55,9 @@ int main(void)
     }
 
     SPI_SetSpeedToNormal();
+
+    Sensors_Setup(false);
+
     printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
 
