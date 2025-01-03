@@ -12,6 +12,7 @@
 #include "encoders.h"
 #include "memory.h"
 #include "battery.h"
+#include "controller.h"
 
 static volatile bool btnFlag = 0;
 
@@ -23,6 +24,7 @@ struct Module *modules[] = {
     &Encoders_module,
     &Memory_module,
     &Battery_module,
+    &Controller_module,
     NULL
 };
 
@@ -56,7 +58,7 @@ int main(void)
 
     SPI_SetSpeedToNormal();
 
-    Sensors_Setup(false);
+    Sensors_SetLightening(DISABLE);
 
     printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
@@ -79,6 +81,8 @@ void SysTick_Handler(void)
     Encoders_Update();
     IMU_Update();
     Battery_Update();
+
+    Controller_Update();
 
     Motors_Update();
 

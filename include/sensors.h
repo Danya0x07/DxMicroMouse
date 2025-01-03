@@ -5,7 +5,7 @@
 #include "module.h"
 
 extern void (*Sensors_Update)(void);
-void Sensors_Setup(bool lighten);
+void Sensors_SetLightening(FunctionalState state);
 void Sensors_ReadToBuffer(uint16_t buffer[5]);
 
 extern struct Module Sensors_module;

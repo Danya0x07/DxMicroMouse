@@ -4,7 +4,7 @@
 
 static volatile int16_t targetL, targetR;
 
-void Motors_SetL(int16_t duty)
+void Motors_SetDutyLeft(int16_t duty)
 {
     duty = duty > MOTOR_DUTY_MAX ? MOTOR_DUTY_MAX :
             duty < -MOTOR_DUTY_MAX ? -MOTOR_DUTY_MAX : duty;
@@ -17,7 +17,7 @@ void Motors_SetL(int16_t duty)
     }
 }
 
-void Motors_SetR(int16_t duty)
+void Motors_SetDutyRight(int16_t duty)
 {
     duty = duty > MOTOR_DUTY_MAX ? MOTOR_DUTY_MAX :
             duty < -MOTOR_DUTY_MAX ? -MOTOR_DUTY_MAX : duty;
@@ -30,9 +30,16 @@ void Motors_SetR(int16_t duty)
     }
 }
 
+void Motors_SetTargetDuty(int16_t left, int16_t right)
+{
+    targetL = left;
+    targetR = right;
+}
+
 void Motors_Update(void)
 {
-    static int16_t currentL = 0, currentR = 0;
+    int16_t currentL = (int16_t)TIM_GetCapture2(TIM4) - (int16_t)TIM_GetCapture1(TIM4);
+    int16_t currentR = (int16_t)TIM_GetCapture3(TIM4) - (int16_t)TIM_GetCapture4(TIM4);
     int16_t tgtL = targetL, tgtR = targetR;
 
     if (currentL < tgtL)
@@ -45,8 +52,8 @@ void Motors_Update(void)
     else if (currentR > tgtR)
         currentR--;
 
-    Motors_SetL(currentL);
-    Motors_SetR(currentR);
+    Motors_SetDutyLeft(currentL);
+    Motors_SetDutyRight(currentR);
 }
 
 static int execute(int argc, char *argv[])
@@ -58,8 +65,7 @@ static int execute(int argc, char *argv[])
     int16_t dutyR = atoi(argv[1]);
 
     if (abs(dutyL) <= MOTOR_DUTY_MAX && abs(dutyR) <= MOTOR_DUTY_MAX) {
-        targetL = dutyL;
-        targetR = dutyR;
+        Motors_SetTargetDuty(dutyL, dutyR);
         return 0;
     }
     return -2;

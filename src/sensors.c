@@ -55,9 +55,9 @@ static void updateWithoutLightening(void)
 
 void (*Sensors_Update)(void) = update;
 
-void Sensors_Setup(bool lighten)
+void Sensors_SetLightening(FunctionalState state)
 {
-    Sensors_Update = lighten ? update : updateWithoutLightening;
+    Sensors_Update = state ? update : updateWithoutLightening;
 }
 
 void Sensors_ReadToBuffer(uint16_t buffer[5])
@@ -83,9 +83,9 @@ static int execute(int argc, char *argv[])
         return -1;
 
     if (!strcmp(argv[0], "lon"))
-        Sensors_Update = update;
+        Sensors_SetLightening(ENABLE);
     else if (!strcmp(argv[0], "loff"))
-        Sensors_Update = updateWithoutLightening;
+        Sensors_SetLightening(DISABLE);
     else
         return -2;
 
