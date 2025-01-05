@@ -13,8 +13,8 @@ typedef enum {
 
 void SpeedCtl_SetState(FunctionalState newState);
 void SpeedCtl_SetMode(SpeedCtlMode mode);
-void SpeedCtl_Setup(float kpv, float kdv, float kpw, float kdw);
-void SpeedCtl_SetTarget(int32_t v, int32_t w);
+void SpeedCtl_Setup(int32_t newTransKp, int32_t newTransKd, int32_t newRotKp, int32_t newRotKd);
+void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS);
 void SpeedCtl_Update(void);
 int32_t SpeedCtl_GetActualTransSpeed(void);
 int32_t SpeedCtl_GetActualRotSpeed(void);

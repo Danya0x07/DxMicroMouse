@@ -17,10 +17,9 @@
 
 static FunctionalState state = ENABLE;
 
-static float kPv, kDv, kPw, kDw;
-static float positionError, rotationError;
-static volatile int32_t targetV, targetW;
-static volatile int32_t currentV, currentW;
+static int32_t transKp, transKd, rotKp, rotKd;
+static int32_t targetVTransInCountsPer1024Ms, targetVRotInLsbsPer1024Ms;
+static int32_t currentVTransInMmPerS, currentVRotInDegPerS;
 
 void SpeedCtl_SetState(FunctionalState newState)
 {
@@ -48,101 +47,80 @@ void SpeedCtl_SetMode(SpeedCtlMode mode)
     }
 }
 
-void SpeedCtl_Setup(float kpv, float kdv, float kpw, float kdw)
+void SpeedCtl_Setup(int32_t newTransKp, int32_t newTransKd, int32_t newRotKp, int32_t newRotKd)
 {
-    kPv = kpv;
-    kDv = kdv;
-    kPw = kpw;
-    kDw = kdw;
+    transKp = newTransKp;
+    transKd = newTransKd;
+    rotKp = newRotKp;
+    rotKd = newRotKd;
 }
 
-void SpeedCtl_SetTarget(int32_t v, int32_t w)
+void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
 {
-    targetV = v;
-    targetW = w;
+    targetVTransInCountsPer1024Ms = ((vTransInMmPerS << 10) * COUNT_PER_MM / 100 + 5) / 10;
+    targetVRotInLsbsPer1024Ms = (((int64_t)vRotInDegPerS << 25) / 200000 + 5) / 10;
 }
 
-static float TranslationControl(float posDelta)
+static int64_t TranslationControl(int32_t deltaInCounts)
 {
-    static float prevPositionError = 0.0;
-    float expectedPosDelta = targetV * 0.001;
+    static int32_t prevPositionErrorInCounts = 0;
+    static int64_t positionErrorInCounts = 0;
 
-    positionError += expectedPosDelta - posDelta;
-    float diffError = positionError - prevPositionError;
-    prevPositionError = positionError;
+    int32_t expectedDeltaInCounts = targetVTransInCountsPer1024Ms; // * 1ms
 
-    return kPv * positionError + kDv * diffError;
+    positionErrorInCounts += expectedDeltaInCounts - deltaInCounts;
+    int32_t diffErrorInCounts = positionErrorInCounts - prevPositionErrorInCounts;
+    prevPositionErrorInCounts = positionErrorInCounts;
+
+    return transKp * positionErrorInCounts + transKd * diffErrorInCounts;
 }
 
-static float RotationControl(float rotDelta)
+static int64_t RotationControl(int32_t deltaInLsbs)
 {
-    static float prevRotationError = 0.0;
-    float expectedRotDelta = targetW * 0.001;
+    static int32_t prevRotationErrorInLsbs = 0;
+    static int64_t rotationErrorInLsbs = 0;
 
-    rotationError += expectedRotDelta - rotDelta;
-    float diffError = rotationError - prevRotationError;
-    prevRotationError = rotationError;
+    int32_t expectedDeltaInLsbs = targetVRotInLsbsPer1024Ms; // * 1ms
 
-    return kPw * rotationError + kDw * diffError;
+    rotationErrorInLsbs += expectedDeltaInLsbs - deltaInLsbs;
+    int32_t diffErrorInLsbs = rotationErrorInLsbs - prevRotationErrorInLsbs;
+    prevRotationErrorInLsbs = rotationErrorInLsbs;
+
+    return rotKp * rotationErrorInLsbs + rotKd * diffErrorInLsbs;
 }
 
 void SpeedCtl_Update(void)
 {
-    //~ int32_t tgtV = targetV, tgtW = targetW;
-    int32_t dCountL, dCountR;
+    int32_t dl, dr;
     struct IMU_Data imuData;
 
-    Encoders_GetDelta(&dCountL, &dCountR);
+    Encoders_GetDelta(&dl, &dr);
     IMU_GetData(&imuData);
 
-    float dl = dCountL / COUNT_PER_MM;
-    float dr = dCountR / COUNT_PER_MM;
-    float dpos = (dl + dr) / 2;
-    //float dang = (dr - dl) * DEG_PER_MM_ROT;
-    float dang = imuData.gyroZ * 2000.0 / 32768;
+    int32_t deltaPosInCounts = (dl + dr) / 2;
+    int32_t deltaAngInLsbs = imuData.gyroZ;
 
-    currentV = dpos * 1000;
-    //currentW = dang * 1000;
-    currentW = dang;
+    currentVTransInMmPerS = deltaPosInCounts * 1000 / COUNT_PER_MM;
+    currentVRotInDegPerS = (deltaAngInLsbs * 2000 / 16384 + 1) / 2;
 
-    Odometry_Update(dpos, dang);
+    //Odometry_Update(deltaPosInCounts, deltaAngInLsbs);
 
-    float posOutput = TranslationControl(dpos);
-    float rotOutput = RotationControl(dang);
-    int16_t leftOutput = posOutput - rotOutput;
-    int16_t rightOutput = posOutput + rotOutput;
-
-    if (leftOutput > 100) {
-        leftOutput += 220;
-    }
-    else if (leftOutput < -100) {
-        leftOutput -= 220;
-    }
-    else {
-        leftOutput = 0;
-    }
-
-    if (rightOutput > 100) {
-        rightOutput += 220;
-    }
-    else if (rightOutput < -100) {
-        rightOutput -= 220;
-    }
-    else {
-        rightOutput = 0;
-    }
+    int64_t posOutput = TranslationControl(deltaPosInCounts << 10);
+    int64_t rotOutput = RotationControl(((deltaAngInLsbs << 10) / 100 + 5) / 10);
+    int32_t leftOutput = (posOutput - rotOutput) / (1 << 20);
+    int32_t rightOutput = (posOutput + rotOutput) / (1 << 20);
 
     if (state == ENABLE)
         Motors_SetPwm(leftOutput, rightOutput);
 }
 
-void TestOpenLoop(int16_t dutyL, int16_t dutyR)
+void TestOpenLoop(int16_t pwmL, int16_t pwmR)
 {
     struct IMU_Data imuData;
     int32_t dl, dr, dp;
 
-    printf("Test %d %d\n", dutyL, dutyR);
-    Motors_SetPwm(dutyL, dutyR);
+    printf("Test %d %d\n", pwmL, pwmR);
+    Motors_SetPwm(pwmL, pwmR);
     for (int i = 0; i < 300; i++) {
         IMU_GetData(&imuData);
         Encoders_GetDelta(&dl, &dr);
@@ -155,12 +133,12 @@ void TestOpenLoop(int16_t dutyL, int16_t dutyR)
 
 int32_t SpeedCtl_GetActualTransSpeed(void)
 {
-    return currentV;
+    return currentVTransInMmPerS;
 }
 
 int32_t SpeedCtl_GetActualRotSpeed(void)
 {
-    return currentW;
+    return currentVRotInDegPerS;
 }
 
 
@@ -171,17 +149,17 @@ int32_t SpeedCtl_GetActualRotSpeed(void)
     //~ Sensors_ReadToBuffer(sensorsValues);
 
     //~ if (dance) {
-        //~ int16_t dutyL = ((int32_t)2000 - sensorsValues[ReceiverChannel_LeftFront]) * 120 / 2000;
-        //~ int16_t dutyR = ((int32_t)2000 - sensorsValues[ReceiverChannel_RightFront]) * 120 / 2000;
+        //~ int16_t pwmL = ((int32_t)2000 - sensorsValues[ReceiverChannel_LeftFront]) * 120 / 2000;
+        //~ int16_t pwmR = ((int32_t)2000 - sensorsValues[ReceiverChannel_RightFront]) * 120 / 2000;
 
-        //~ dutyL = dutyL > 0 ? dutyL + 240 : dutyL - 240;
-        //~ dutyR = dutyR > 0 ? dutyR + 240 : dutyR - 240;
+        //~ pwmL = pwmL > 0 ? pwmL + 240 : pwmL - 240;
+        //~ pwmR = pwmR > 0 ? pwmR + 240 : pwmR - 240;
 
-        //~ Motors_SetDutyLeft(dutyL);
-        //~ Motors_SetDutyRight(dutyR);
-        //~ Motors_SetTargetDuty(dutyL, dutyR);
+        //~ Motors_SetpwmLeft(pwmL);
+        //~ Motors_SetpwmRight(pwmR);
+        //~ Motors_SetTargetpwm(pwmL, pwmR);
     //~ } else {
-        //~ Motors_SetTargetDuty(0, 0);
+        //~ Motors_SetTargetpwm(0, 0);
     //~ }
 //~ }
 
@@ -193,24 +171,24 @@ static int execute(int argc, char *argv[])
     if (!strcmp(argv[0], "set")) {
         if (argc != 5)
             return -1;
-        kPv = atoi(argv[1]) / 10.0;
-        kDv = atoi(argv[2]) / 10.0;
-        kPw = atoi(argv[3]) / 10.0;
-        kDw = atoi(argv[4]) / 10.0;
+        transKp = atol(argv[1]);
+        transKd = atol(argv[2]);
+        rotKp = atol(argv[3]);
+        rotKd = atol(argv[4]);
     }
     else if (!strcmp(argv[0], "test")) {
         if (argc != 3)
             return -1;
-        int16_t dutyL = atoi(argv[1]);
-        int16_t dutyR = atoi(argv[2]);
-        TestOpenLoop(dutyL, dutyR);
+        int16_t pwmL = atoi(argv[1]);
+        int16_t pwmR = atoi(argv[2]);
+        TestOpenLoop(pwmL, pwmR);
     }
     else if (!strcmp(argv[0], "tgt")) {
         if (argc != 3)
             return -1;
-        int32_t tgtV = atoi(argv[1]);
-        int32_t tgtW = atoi(argv[2]);
-        SpeedCtl_SetTarget(tgtV, tgtW);
+        int32_t vTransInMmPerS = atoi(argv[1]);
+        int32_t vRotInDegPerS = atoi(argv[2]);
+        SpeedCtl_SetTarget(vTransInMmPerS, vRotInDegPerS);
     }
     else if (!strcmp(argv[0], "mode")) {
         if (argc != 2)
@@ -237,7 +215,7 @@ static int execute(int argc, char *argv[])
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    snprintf(out, TELEMETRY_STRING_SIZE, "V:%ld\tW:%ld\n", currentV, currentW);
+    snprintf(out, TELEMETRY_STRING_SIZE, "V:%ld\tW:%ld\n", currentVTransInMmPerS, currentVRotInDegPerS);
 }
 
 static struct TelemetryControlBlock telemetryControlBlock = {

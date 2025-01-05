@@ -62,8 +62,8 @@ int main(void)
     SPI_SetSpeedToNormal();
 
     Sensors_SetLightening(DISABLE);
-    Odometry_Reset();
-    SpeedCtl_Setup(5, 100, 0.1, 1);
+    //Odometry_Reset();
+    SpeedCtl_Setup(1000, 10000, 3000, 100000);
     Button_EnableInterrupt();
 
     printf("======= INITIALIZATION FINISHED =======\n");
@@ -97,6 +97,7 @@ void EXTI1_IRQHandler(void)
     if(EXTI_GetITStatus(EXTI_Line1) != RESET) {
         btnFlag = 1;
         SpeedCtl_SetState(DISABLE);
+        Motors_SetPwm(0, 0);
         EXTI_ClearITPendingBit(EXTI_Line1);
     }
 }
