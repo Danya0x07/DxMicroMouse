@@ -134,7 +134,7 @@ static inline void initGPIO(void)
     GPIO_Init(BUZZER_GPIO, &GPIO_InitStructure);
 
     // FAN
-#ifdef FAN_PWM
+#ifdef FAN_PWM_MAX
     GPIO_PinRemapConfig(GPIO_PartialRemap_TIM3, ENABLE);
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF_PP;
 #else
@@ -230,8 +230,8 @@ static inline void initTimers(void)
     TIM_ARRPreloadConfig(TIM2, ENABLE);
 
     // Motors
-    TIM_TimeBaseInitStructure.TIM_Period = MOTOR_DUTY_MAX;
-    TIM_TimeBaseInitStructure.TIM_Prescaler = MCU_rccClocks.PCLK1_Frequency / MOTOR_FREQ / MOTOR_DUTY_MAX - 1;
+    TIM_TimeBaseInitStructure.TIM_Period = MOTOR_PWM_MAX;
+    TIM_TimeBaseInitStructure.TIM_Prescaler = MCU_rccClocks.PCLK1_Frequency / MOTOR_FREQ / MOTOR_PWM_MAX - 1;
     TIM_TimeBaseInitStructure.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_TimeBaseInitStructure.TIM_CounterMode = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM4, &TIM_TimeBaseInitStructure);
@@ -253,7 +253,7 @@ static inline void initTimers(void)
     TIM_CtrlPWMOutputs(TIM4, ENABLE);
     TIM_Cmd(TIM4, ENABLE);
 
-#ifdef FAN_PWM
+#ifdef FAN_PWM_MAX
     // Fan
     TIM_TimeBaseInit(TIM3, &TIM_TimeBaseInitStructure);
     TIM_OC1Init(TIM3, &TIM_OCInitStructure);

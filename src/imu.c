@@ -78,11 +78,13 @@ int IMU_Init(void)
         .fsyncActiveLevelLow = false
     };
 
+    SysTick_DisableInterrupt();
+
     // Perform reset
     MPU6500_ResetDevice();
-    Millis_Wait(100);
+    Micros_WaitMillis(100);
     MPU6500_ResetSignalPath(true, true, true);
-    Millis_Wait(100);
+    Micros_WaitMillis(100);
 
     // Check ID
     uint8_t id;
@@ -95,7 +97,7 @@ int IMU_Init(void)
     MPU6500_ConfigureInterruptPin(&intPinConfig);
     MPU6500_SetPowerMode(MPU6500_PowerMode_6AXIS);
     MPU6500_SetClockSource(MPU6500_ClockSource_AUTOPLL);
-    Millis_Wait(100);
+    Micros_WaitMillis(100);
 
     // Perform self-test
     LED1_ON();
@@ -111,7 +113,7 @@ int IMU_Init(void)
         avgGyroX += sensorData.gyroX;
         avgGyroY += sensorData.gyroY;
         avgGyroZ += sensorData.gyroZ;
-        Millis_Wait(1);
+        Micros_Wait(1000);
     }
     avgAccelX /= 200;
     avgAccelY /= 200;
@@ -124,7 +126,7 @@ int IMU_Init(void)
         MPU6500_SELFTEST_XA | MPU6500_SELFTEST_YA | MPU6500_SELFTEST_ZA
         | MPU6500_SELFTEST_XG | MPU6500_SELFTEST_YG | MPU6500_SELFTEST_ZG
     );
-    Millis_Wait(25);
+    Micros_Wait(25000);
 
     int32_t testAccelX = 0, testAccelY = 0, testAccelZ = 0, testGyroX = 0, testGyroY = 0, testGyroZ = 0;
 
@@ -136,7 +138,7 @@ int IMU_Init(void)
         testGyroX += sensorData.gyroX;
         testGyroY += sensorData.gyroY;
         testGyroZ += sensorData.gyroZ;
-        Millis_Wait(1);
+        Micros_Wait(1000);
     }
     testAccelX /= 200;
     testAccelY /= 200;
@@ -177,13 +179,13 @@ int IMU_Init(void)
     // Check offsets
     MPU6500_GetOffset(&sensorData);
     // Convert to range +-16g and +-1000 dps
-    sensorData.accelX -= (int16_t)avgAccelX >> 4;
-    sensorData.accelY -= (int16_t)avgAccelY >> 4;
+    sensorData.accelX -= (int16_t)((avgAccelX / 8) + 1) / 2;
+    sensorData.accelY -= (int16_t)((avgAccelY / 8) + 1) / 2;
     avgAccelZ = avgAccelZ > 0 ? avgAccelZ - 16384 : avgAccelZ + 16384;
-    sensorData.accelZ -= (int16_t)avgAccelZ >> 4;
-    sensorData.gyroX -= (int16_t)avgGyroX >> 2;
-    sensorData.gyroY -= (int16_t)avgGyroY >> 2;
-    sensorData.gyroZ -= (int16_t)avgGyroZ >> 2;
+    sensorData.accelZ -= (int16_t)((avgAccelZ / 8) + 1) / 2;
+    sensorData.gyroX = -(int16_t)((avgGyroX / 2) + 1) / 2;
+    sensorData.gyroY = -(int16_t)((avgGyroY / 2) + 1) / 2;
+    sensorData.gyroZ = -(int16_t)((avgGyroZ / 2) + 1) / 2;
     MPU6500_SetOffset(&sensorData);
     printf("MPU6500 calculated offsets:\n");
     printf("gX:%-5d\tgY:%-5d\tgZ:%-5d\taX:%-5d\taY:%-5d\taZ:%-5d\n",
@@ -192,12 +194,12 @@ int IMU_Init(void)
     );
 
     // Application config
-    config.gyro.bandwidth = MPU6500_GYRO_BANDWIDTH_184Hz_2Ms9;
-    config.gyro.range = MPU6500_GYRO_RANGE_500DPS;
+    config.gyro.bandwidth = MPU6500_GYRO_BANDWIDTH_250Hz_0Ms97;
+    config.gyro.range = MPU6500_GYRO_RANGE_2000DPS;
     config.accel.bandwidth = MPU6500_ACCEL_BANDWIDTH_184Hz_5Ms8;
     config.accel.range = MPU6500_ACCEL_RANGE_4G;
     MPU6500_Configure(&config);
-    Millis_Wait(25);
+    Micros_Wait(25000);
 
     // Configure interrupt
     const struct MPU6500_InterruptConfiguration intConfig = {
@@ -208,6 +210,8 @@ int IMU_Init(void)
     };
 
     MPU6500_ConfigureInterrupt(&intConfig);
+
+    SysTick_EnableInterrupt();
     return retcode;
 }
 

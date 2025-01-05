@@ -3,15 +3,11 @@
 
 #include "module.h"
 
-struct Encoders_Data {
-    int32_t ticksLeft;
-    int32_t ticksRight;
-};
-
 int Encoders_Init(void);
 void Encoders_Update(void);
 void Encoders_Reset(void);
-void Encoders_GetData(struct Encoders_Data *data);
+void Encoders_GetCounts(int32_t *left, int32_t *right);
+void Encoders_GetDelta(int32_t *left, int32_t *right);
 
 extern struct Module Encoders_module;
 

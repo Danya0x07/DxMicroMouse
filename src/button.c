@@ -43,6 +43,7 @@ ButtonEvent_t Button_GetNextEvent(void)
 
 void Button_EnableInterrupt(void)
 {
+    EXTI_ClearITPendingBit(EXTI_Line1);
     NVIC_EnableIRQ(EXTI1_IRQn);
 }
 

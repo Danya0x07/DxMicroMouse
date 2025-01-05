@@ -85,9 +85,9 @@
 #define BATTERY_CH      ADC_Channel_0
 
 #define MOTOR_FREQ  100000
-#define MOTOR_DUTY_MAX    360
+#define MOTOR_PWM_MAX    360
 
-#define FAN_PWM
+#define FAN_PWM_MAX 150
 
 extern RCC_ClocksTypeDef MCU_rccClocks;
 extern volatile uint32_t MCU_millis;
@@ -105,6 +105,12 @@ static inline uint16_t Micros_Get(void)
 }
 
 void Micros_Wait(uint16_t us);
+
+static inline void Micros_WaitMillis(uint16_t ms)
+{
+    while (ms--)
+        Micros_Wait(1000);
+}
 
 static inline uint32_t Millis_Get(void)
 {

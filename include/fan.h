@@ -5,7 +5,7 @@
 
 void Fan_On(void);
 void Fan_Off(void);
-void Fan_SetDuty(uint16_t duty);
+void Fan_SetPwm(uint16_t duty);
 
 extern struct Module Fan_module;
 

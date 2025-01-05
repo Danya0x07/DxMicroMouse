@@ -2,21 +2,21 @@
 #include "mcu.h"
 #include <stdlib.h>
 
-#ifdef FAN_PWM
+#ifdef FAN_PWM_MAX
 
 void Fan_On(void)
 {
-    Fan_SetDuty(MOTOR_DUTY_MAX >> 1);
+    Fan_SetPwm(FAN_PWM_MAX);
 }
 
 void Fan_Off(void)
 {
-    Fan_SetDuty(0);
+    Fan_SetPwm(0);
 }
 
-void Fan_SetDuty(uint16_t duty)
+void Fan_SetPwm(uint16_t pwm)
 {
-    TIM_SetCompare1(TIM3, duty);
+    TIM_SetCompare1(TIM3, pwm > FAN_PWM_MAX ? FAN_PWM_MAX : pwm);
 }
 
 #else
@@ -32,9 +32,9 @@ void Fan_Off(void)
     GPIO_ResetBits(MOTORS_GPIO, FAN_PIN);
 }
 
-void Fan_SetDuty(uint16_t duty)
+void Fan_SetPwm(uint16_t pwm)
 {
-    (void)duty;
+    (void)pwm;
 }
 
 #endif
@@ -44,12 +44,9 @@ static int execute(int argc, char *argv[])
     if (argc != 1)
         return -1;
 
-    uint16_t duty = atoi(argv[0]);
-    if (duty <= MOTOR_DUTY_MAX >> 1) {
-        Fan_SetDuty(duty);
-        return 0;
-    }
-    return -2;
+    uint16_t pwm = atoi(argv[0]);
+    Fan_SetPwm(pwm);
+    return 0;
 }
 
 struct Module Fan_module = {

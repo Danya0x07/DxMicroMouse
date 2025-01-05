@@ -2,58 +2,46 @@
 #include "mcu.h"
 #include <stdlib.h>
 
-static volatile int16_t targetL, targetR;
-
-void Motors_SetDutyLeft(int16_t duty)
+static int16_t ConstrainPwm(int16_t pwm)
 {
-    duty = duty > MOTOR_DUTY_MAX ? MOTOR_DUTY_MAX :
-            duty < -MOTOR_DUTY_MAX ? -MOTOR_DUTY_MAX : duty;
-    if (duty > 0) {
+    return pwm > MOTOR_PWM_MAX ? MOTOR_PWM_MAX :
+            pwm < -MOTOR_PWM_MAX ? -MOTOR_PWM_MAX : pwm;
+}
+
+static void SetLeftPwm(int16_t pwm)
+{
+    pwm = ConstrainPwm(pwm);
+    if (pwm > 0) {
         TIM_SetCompare1(TIM4, 0);
-        TIM_SetCompare2(TIM4, duty);
+        TIM_SetCompare2(TIM4, pwm);
     } else {
         TIM_SetCompare2(TIM4, 0);
-        TIM_SetCompare1(TIM4, -duty);
+        TIM_SetCompare1(TIM4, -pwm);
     }
 }
 
-void Motors_SetDutyRight(int16_t duty)
+static void SetRightPwm(int16_t pwm)
 {
-    duty = duty > MOTOR_DUTY_MAX ? MOTOR_DUTY_MAX :
-            duty < -MOTOR_DUTY_MAX ? -MOTOR_DUTY_MAX : duty;
-    if (duty > 0) {
+    pwm = ConstrainPwm(pwm);
+    if (pwm > 0) {
         TIM_SetCompare4(TIM4, 0);
-        TIM_SetCompare3(TIM4, duty);
+        TIM_SetCompare3(TIM4, pwm);
     } else {
         TIM_SetCompare3(TIM4, 0);
-        TIM_SetCompare4(TIM4, -duty);
+        TIM_SetCompare4(TIM4, -pwm);
     }
 }
 
-void Motors_SetTargetDuty(int16_t left, int16_t right)
+void Motors_SetPwm(int16_t left, int16_t right)
 {
-    targetL = left;
-    targetR = right;
+    SetLeftPwm(left);
+    SetRightPwm(right);
 }
 
-void Motors_Update(void)
+void Motors_GetPwm(int16_t *left, int16_t *right)
 {
-    int16_t currentL = (int16_t)TIM_GetCapture2(TIM4) - (int16_t)TIM_GetCapture1(TIM4);
-    int16_t currentR = (int16_t)TIM_GetCapture3(TIM4) - (int16_t)TIM_GetCapture4(TIM4);
-    int16_t tgtL = targetL, tgtR = targetR;
-
-    if (currentL < tgtL)
-        currentL++;
-    else if (currentL > tgtL)
-        currentL--;
-
-    if (currentR < tgtR)
-        currentR++;
-    else if (currentR > tgtR)
-        currentR--;
-
-    Motors_SetDutyLeft(currentL);
-    Motors_SetDutyRight(currentR);
+    *left = (int16_t)TIM_GetCapture2(TIM4) - (int16_t)TIM_GetCapture1(TIM4);
+    *right = (int16_t)TIM_GetCapture3(TIM4) - (int16_t)TIM_GetCapture4(TIM4);
 }
 
 static int execute(int argc, char *argv[])
@@ -61,18 +49,28 @@ static int execute(int argc, char *argv[])
     if (argc != 2)
         return -1;
 
-    int16_t dutyL = atoi(argv[0]);
-    int16_t dutyR = atoi(argv[1]);
+    int16_t pwmLeft = atoi(argv[0]);
+    int16_t pwmRight = atoi(argv[1]);
 
-    if (abs(dutyL) <= MOTOR_DUTY_MAX && abs(dutyR) <= MOTOR_DUTY_MAX) {
-        Motors_SetTargetDuty(dutyL, dutyR);
-        return 0;
-    }
-    return -2;
+    Motors_SetPwm(pwmLeft, pwmRight);
+    return 0;
 }
+
+static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+{
+    int16_t pwmLeft, pwmRight;
+
+    Motors_GetPwm(&pwmLeft, &pwmRight);
+    snprintf(out, TELEMETRY_STRING_SIZE, "L:%d\tR:%d\n", pwmLeft, pwmRight);
+}
+
+static struct TelemetryControlBlock telemetryControlBlock = {
+    .interval = 50,
+    .write = WriteTelemetry
+};
 
 struct Module Motors_module = {
     .name = "motors",
     .execute = execute,
-    .telemetry = NULL
+    .telemetry = &telemetryControlBlock
 };

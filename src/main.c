@@ -12,7 +12,8 @@
 #include "encoders.h"
 #include "memory.h"
 #include "battery.h"
-#include "controller.h"
+#include "speedctl.h"
+#include "odometry.h"
 
 static volatile bool btnFlag = 0;
 
@@ -24,7 +25,8 @@ struct Module *modules[] = {
     &Encoders_module,
     &Memory_module,
     &Battery_module,
-    &Controller_module,
+    &SpeedCtl_module,
+    &Odometry_module,
     NULL
 };
 
@@ -49,6 +51,7 @@ int main(void)
         Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
         LED0_Blink(2, 200);
     }
+    Encoders_Reset();
 
     if ((retcode = IMU_Init()) != 0) {
         printf("IMU retcode: %d\n", retcode);
@@ -59,6 +62,9 @@ int main(void)
     SPI_SetSpeedToNormal();
 
     Sensors_SetLightening(DISABLE);
+    Odometry_Reset();
+    SpeedCtl_Setup(5, 100, 0.1, 1);
+    Button_EnableInterrupt();
 
     printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
@@ -75,18 +81,14 @@ void SysTick_Handler(void)
 
     SysTick_Reset();
 
-    MEMORY_HOLD_TRANSACTION();
-
     Sensors_Update();
+    MEMORY_HOLD_TRANSACTION();
     Encoders_Update();
     IMU_Update();
+    MEMORY_UNHOLD_TRANSACTION();
     Battery_Update();
 
-    Controller_Update();
-
-    Motors_Update();
-
-    MEMORY_UNHOLD_TRANSACTION();
+    SpeedCtl_Update();
 }
 
 __attribute__((interrupt("WCH-Interrupt-fast")))
@@ -94,6 +96,7 @@ void EXTI1_IRQHandler(void)
 {
     if(EXTI_GetITStatus(EXTI_Line1) != RESET) {
         btnFlag = 1;
+        SpeedCtl_SetState(DISABLE);
         EXTI_ClearITPendingBit(EXTI_Line1);
     }
 }
