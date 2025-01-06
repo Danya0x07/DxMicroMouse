@@ -1,33 +1,45 @@
 #include "odometry.h"
-#include <math.h>
+#include "utils.h"
 #include <stdio.h>
 #include <string.h>
 
-static float currentX, currentY, currentAng;
+struct Odometry {
+    int64_t lsbAng;
+    int32_t vTransInCountsPerS, vRotInImuUnitsPerS;
+    int32_t countsX, countsY, degAng;
+};
+
+static struct Odometry odometry;
 
 void Odometry_Reset()
 {
-    currentX = currentY = currentAng = 0;
+    odometry = (struct Odometry){0};
 }
 
-void Odometry_Update(float deltaPos, float deltaAng)
+void Odometry_Update(int32_t transInCounts, int32_t deltaAngInMimuUnits)
 {
-    float angRadians = currentAng * M_PI / 180;
+    odometry.vTransInCountsPerS = transInCounts * 1000;
+    odometry.vRotInImuUnitsPerS = deltaAngInMimuUnits; /* / 1ms */
+    odometry.lsbAng += deltaAngInMimuUnits;
 
-    currentY += deltaPos * cos(angRadians);
-    currentX += deltaPos * -sin(angRadians);
-    currentAng += deltaAng;
-    if (currentAng > 180)
-        currentAng -= 360;
-    if (currentAng < -180)
-        currentAng += 360;
+    odometry.degAng = ((odometry.lsbAng * 2000 / 32768) / 100 + 5) / 10;
+    odometry.degAng = NormalizeAngleDegrees(odometry.degAng);
+
+    odometry.countsY += transInCounts * Cos1000(odometry.degAng) / 1000;
+    odometry.countsX += transInCounts * -Sin1000(odometry.degAng) / 1000;
 }
 
-void Odometry_Get(float *x, float *y, float *ang)
+void Odometry_GetPosition(int32_t *mmX, int32_t *mmY, int32_t *degAng)
 {
-    *x = currentX;
-    *y = currentY;
-    *ang = currentAng;
+    *mmX = odometry.countsX / COUNTS_PER_MM;
+    *mmY = odometry.countsY / COUNTS_PER_MM;
+    *degAng = odometry.degAng;
+}
+
+void Odometry_GetVelocity(int16_t *vTransInMmPerS, int16_t *vRotInDegPerS)
+{
+    *vTransInMmPerS = odometry.vTransInCountsPerS / COUNTS_PER_MM;
+    *vRotInDegPerS = (odometry.vRotInImuUnitsPerS * 2000 / 16384 + 1) / 2;;
 }
 
 static int execute(int argc, char *argv[])
@@ -35,7 +47,7 @@ static int execute(int argc, char *argv[])
     if (argc < 1)
         return -1;
 
-    if (!strcmp(argv[0], "reset")) {
+    if (!strcmp(argv[0], "rst")) {
         Odometry_Reset();
     }
     return 0;
@@ -43,8 +55,13 @@ static int execute(int argc, char *argv[])
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    snprintf(out, TELEMETRY_STRING_SIZE, "x:%d\ty:%d\tAng:%d\n",
-            (int16_t)currentX, (int16_t)currentY, (int16_t)currentAng);
+    int32_t mmX, mmY, degAng;
+    int16_t vTransInMmPerS, vRotInDegPerS;
+
+    Odometry_GetPosition(&mmX, &mmY, &degAng);
+    Odometry_GetVelocity(&vTransInMmPerS, &vRotInDegPerS);
+    snprintf(out, TELEMETRY_STRING_SIZE, "x:%ld\ty:%ld\tAng:%ld\tv:%d\tw:%d\n",
+            mmX, mmY, degAng, vTransInMmPerS, vRotInDegPerS);
 }
 
 static struct TelemetryControlBlock telemetryControlBlock = {

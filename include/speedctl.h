@@ -17,8 +17,6 @@ void SpeedCtl_SetMode(SpeedCtlMode mode);
 void SpeedCtl_Setup(int32_t vTransKp, int32_t vTransKi, int32_t vRotKp, int32_t vRotKi);
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS);
 void SpeedCtl_Update(void);
-int32_t SpeedCtl_GetVTransInMmPerS(void);
-int32_t SpeedCtl_GetVRotInDegPerS(void);
 
 extern struct Module SpeedCtl_module;
 

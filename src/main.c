@@ -60,7 +60,7 @@ int main(void)
     SPI_SetSpeedToNormal();
 
     Sensors_SetLightening(DISABLE);
-    //Odometry_Reset();
+    Odometry_Reset();
     SpeedCtl_Setup(10000, 1000, 100000, 3000);
     Button_EnableInterrupt();
 

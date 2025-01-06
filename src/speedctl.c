@@ -8,17 +8,12 @@
 #include "odometry.h"
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
-#define ENCODER_RESOLUTION  12
-#define WHEEL_DIAMETER  21
-#define COUNT_PER_MM    60 // ((float)(1 << ENCODER_RESOLUTION) / (WHEEL_DIAMETER * M_PI))
 #define MIN_OUTPUT_THRESHOLD    50
 
 static FunctionalState state = ENABLE;
 
-static int32_t targetVTransInCountsPer1024Ms, targetVRotInLsbsPer1024Ms;
-static int32_t currentVTransInMmPerS, currentVRotInDegPerS;
+static int32_t targetVTransInCountsPerS, targetVRotInLsbs;
 static struct Regulator vTransRegulator, vRotRegulator;
 
 void SpeedCtl_Reset(void)
@@ -63,8 +58,8 @@ void SpeedCtl_Setup(int32_t vTransKp, int32_t vTransKi, int32_t vRotKp, int32_t 
 
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
 {
-    targetVTransInCountsPer1024Ms = ((vTransInMmPerS << 10) * COUNT_PER_MM / 100 + 5) / 10;
-    targetVRotInLsbsPer1024Ms = (((int64_t)vRotInDegPerS << 25) / 200000 + 5) / 10;
+    targetVTransInCountsPerS = vTransInMmPerS * COUNTS_PER_MM;
+    targetVRotInLsbs = ((vRotInDegPerS << 15) / 200 + 5) / 10;
 }
 
 static int32_t AdjustRegOutput(int32_t regOutput)
@@ -83,21 +78,20 @@ void SpeedCtl_Update(void)
     Encoders_GetDelta(&dl, &dr);
     IMU_GetData(&imuData);
 
-    int32_t deltaPosInCounts = (dl + dr) / 2;
-    int32_t deltaAngInLsbs = imuData.gyroZ;
+    int32_t transInCounts = (dl + dr) / 2;
+    int32_t vRotInLsbs = imuData.gyroZ;
 
-    currentVTransInMmPerS = deltaPosInCounts * 1000 / COUNT_PER_MM;
-    currentVRotInDegPerS = (deltaAngInLsbs * 2000 / 16384 + 1) / 2;
+    // IMU LSBs = ImuUnits/S = mImuUnits/ms ~ Deg/S = mDeg/ms
+    //                                  ^
+    int32_t deltaAngInMimuUnits = vRotInLsbs; // * 1ms;
 
-    //Odometry_Update(deltaPosInCounts, deltaAngInLsbs);
+    Odometry_Update(transInCounts, deltaAngInMimuUnits);
 
-    int64_t posOutput = Regulator_Output(&vTransRegulator, targetVTransInCountsPer1024Ms,
-            deltaPosInCounts << 10);
-    int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbsPer1024Ms,
-            ((deltaAngInLsbs << 10) / 100 + 5) / 10);
+    int64_t posOutput = Regulator_Output(&vTransRegulator, targetVTransInCountsPerS, transInCounts * 1000);
+    int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
 
-    int32_t leftOutput = (posOutput - rotOutput) / (1 << 20);
-    int32_t rightOutput = (posOutput + rotOutput) / (1 << 20);
+    int32_t leftOutput = ((posOutput - rotOutput) / 100000 + 5) / 10;
+    int32_t rightOutput = ((posOutput + rotOutput) / 100000 + 5) / 10;
 
     leftOutput = AdjustRegOutput(leftOutput);
     rightOutput = AdjustRegOutput(rightOutput);
@@ -106,32 +100,22 @@ void SpeedCtl_Update(void)
         Motors_SetPwm(leftOutput, rightOutput);
 }
 
-int32_t SpeedCtl_GetVTransInMmPerS(void)
-{
-    return currentVTransInMmPerS;
-}
+//~ static void TestOpenLoop(int16_t pwmL, int16_t pwmR)
+//~ {
+    //~ struct IMU_Data imuData;
+    //~ int32_t dl, dr, dp;
 
-int32_t SpeedCtl_GetVRotInDegPerS(void)
-{
-    return currentVRotInDegPerS;
-}
-
-static void TestOpenLoop(int16_t pwmL, int16_t pwmR)
-{
-    struct IMU_Data imuData;
-    int32_t dl, dr, dp;
-
-    printf("Test %d %d\n", pwmL, pwmR);
-    Motors_SetPwm(pwmL, pwmR);
-    for (int i = 0; i < 300; i++) {
-        IMU_GetData(&imuData);
-        Encoders_GetDelta(&dl, &dr);
-        dp = (dl + dr) / 2;
-        printf("%d,%ld\n", imuData.gyroZ, dp);
-        Millis_Wait(10);
-    }
-    Motors_SetPwm(0, 0);
-}
+    //~ printf("Test %d %d\n", pwmL, pwmR);
+    //~ Motors_SetPwm(pwmL, pwmR);
+    //~ for (int i = 0; i < 300; i++) {
+        //~ IMU_GetData(&imuData);
+        //~ Encoders_GetDelta(&dl, &dr);
+        //~ dp = (dl + dr) / 2;
+        //~ printf("%d,%ld\n", imuData.gyroZ, dp);
+        //~ Millis_Wait(10);
+    //~ }
+    //~ Motors_SetPwm(0, 0);
+//~ }
 
 //~ void Controller_Update(void)
 //~ {
@@ -168,13 +152,13 @@ static int execute(int argc, char *argv[])
         int32_t vRotKi = atol(argv[4]);
         SpeedCtl_Setup(vTransKp, vTransKi, vRotKp, vRotKi);
     }
-    else if (!strcmp(argv[0], "test")) {
-        if (argc != 3)
-            return -1;
-        int16_t pwmL = atoi(argv[1]);
-        int16_t pwmR = atoi(argv[2]);
-        TestOpenLoop(pwmL, pwmR);
-    }
+    //~ else if (!strcmp(argv[0], "test")) {
+        //~ if (argc != 3)
+            //~ return -1;
+        //~ int16_t pwmL = atoi(argv[1]);
+        //~ int16_t pwmR = atoi(argv[2]);
+        //~ TestOpenLoop(pwmL, pwmR);
+    //~ }
     else if (!strcmp(argv[0], "tgt")) {
         if (argc != 3)
             return -1;
@@ -206,18 +190,8 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
-{
-    snprintf(out, TELEMETRY_STRING_SIZE, "V:%ld\tW:%ld\n", currentVTransInMmPerS, currentVRotInDegPerS);
-}
-
-static struct TelemetryControlBlock telemetryControlBlock = {
-    .interval = 50,
-    .write = WriteTelemetry
-};
-
 struct Module SpeedCtl_module = {
     .name = "spctl",
     .execute = execute,
-    .telemetry = &telemetryControlBlock
+    .telemetry = NULL
 };
