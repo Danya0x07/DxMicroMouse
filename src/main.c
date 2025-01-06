@@ -15,8 +15,6 @@
 #include "speedctl.h"
 #include "odometry.h"
 
-static volatile bool btnFlag = 0;
-
 struct Module *modules[] = {
     &Sensors_module,
     &IMU_module,
@@ -63,11 +61,12 @@ int main(void)
 
     Sensors_SetLightening(DISABLE);
     //Odometry_Reset();
-    SpeedCtl_Setup(1000, 10000, 3000, 100000);
+    SpeedCtl_Setup(10000, 1000, 100000, 3000);
     Button_EnableInterrupt();
 
     printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
+    SpeedCtl_Reset();
 
     for (;;) {
         Shell_Spin();
@@ -95,23 +94,8 @@ __attribute__((interrupt("WCH-Interrupt-fast")))
 void EXTI1_IRQHandler(void)
 {
     if(EXTI_GetITStatus(EXTI_Line1) != RESET) {
-        btnFlag = 1;
         SpeedCtl_SetState(DISABLE);
         Motors_SetPwm(0, 0);
         EXTI_ClearITPendingBit(EXTI_Line1);
-    }
-}
-
-__attribute__((interrupt("WCH-Interrupt-fast")))
-void NMI_Handler(void)
-{
-
-}
-
-__attribute__((interrupt("WCH-Interrupt-fast")))
-void HardFault_Handler(void)
-{
-    for (;;) {
-
     }
 }

@@ -4,6 +4,7 @@
 #include "motors.h"
 #include "encoders.h"
 #include "imu.h"
+#include "regulator.h"
 #include "odometry.h"
 #include <stdlib.h>
 #include <string.h>
@@ -11,15 +12,20 @@
 
 #define ENCODER_RESOLUTION  12
 #define WHEEL_DIAMETER  21
-//#define COUNT_PER_MM    ((float)(1 << ENCODER_RESOLUTION) / (WHEEL_DIAMETER * M_PI))
-#define COUNT_PER_MM    60.0
-#define DEG_PER_MM_ROT  0.93 // arcsin((dxr - dxl) / mouse_width)
+#define COUNT_PER_MM    60 // ((float)(1 << ENCODER_RESOLUTION) / (WHEEL_DIAMETER * M_PI))
+#define MIN_OUTPUT_THRESHOLD    50
 
 static FunctionalState state = ENABLE;
 
-static int32_t transKp, transKd, rotKp, rotKd;
 static int32_t targetVTransInCountsPer1024Ms, targetVRotInLsbsPer1024Ms;
 static int32_t currentVTransInMmPerS, currentVRotInDegPerS;
+static struct Regulator vTransRegulator, vRotRegulator;
+
+void SpeedCtl_Reset(void)
+{
+    Regulator_Reset(&vTransRegulator);
+    Regulator_Reset(&vRotRegulator);
+}
 
 void SpeedCtl_SetState(FunctionalState newState)
 {
@@ -47,12 +53,12 @@ void SpeedCtl_SetMode(SpeedCtlMode mode)
     }
 }
 
-void SpeedCtl_Setup(int32_t newTransKp, int32_t newTransKd, int32_t newRotKp, int32_t newRotKd)
+void SpeedCtl_Setup(int32_t vTransKp, int32_t vTransKi, int32_t vRotKp, int32_t vRotKi)
 {
-    transKp = newTransKp;
-    transKd = newTransKd;
-    rotKp = newRotKp;
-    rotKd = newRotKd;
+    // Velocity PI regulator = Position PD regulator. Математика, ёпт.
+    SpeedCtl_Reset();
+    Regulator_Setup(&vTransRegulator, vTransKp, vTransKi, 0);
+    Regulator_Setup(&vRotRegulator, vRotKp, vRotKi, 0);
 }
 
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
@@ -61,32 +67,12 @@ void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
     targetVRotInLsbsPer1024Ms = (((int64_t)vRotInDegPerS << 25) / 200000 + 5) / 10;
 }
 
-static int64_t TranslationControl(int32_t deltaInCounts)
+static int32_t AdjustRegOutput(int32_t regOutput)
 {
-    static int32_t prevPositionErrorInCounts = 0;
-    static int64_t positionErrorInCounts = 0;
-
-    int32_t expectedDeltaInCounts = targetVTransInCountsPer1024Ms; // * 1ms
-
-    positionErrorInCounts += expectedDeltaInCounts - deltaInCounts;
-    int32_t diffErrorInCounts = positionErrorInCounts - prevPositionErrorInCounts;
-    prevPositionErrorInCounts = positionErrorInCounts;
-
-    return transKp * positionErrorInCounts + transKd * diffErrorInCounts;
-}
-
-static int64_t RotationControl(int32_t deltaInLsbs)
-{
-    static int32_t prevRotationErrorInLsbs = 0;
-    static int64_t rotationErrorInLsbs = 0;
-
-    int32_t expectedDeltaInLsbs = targetVRotInLsbsPer1024Ms; // * 1ms
-
-    rotationErrorInLsbs += expectedDeltaInLsbs - deltaInLsbs;
-    int32_t diffErrorInLsbs = rotationErrorInLsbs - prevRotationErrorInLsbs;
-    prevRotationErrorInLsbs = rotationErrorInLsbs;
-
-    return rotKp * rotationErrorInLsbs + rotKd * diffErrorInLsbs;
+    if (regOutput < MIN_OUTPUT_THRESHOLD && -regOutput < MIN_OUTPUT_THRESHOLD) {
+        return 0;
+    }
+    return regOutput;
 }
 
 void SpeedCtl_Update(void)
@@ -105,16 +91,32 @@ void SpeedCtl_Update(void)
 
     //Odometry_Update(deltaPosInCounts, deltaAngInLsbs);
 
-    int64_t posOutput = TranslationControl(deltaPosInCounts << 10);
-    int64_t rotOutput = RotationControl(((deltaAngInLsbs << 10) / 100 + 5) / 10);
+    int64_t posOutput = Regulator_Output(&vTransRegulator, targetVTransInCountsPer1024Ms,
+            deltaPosInCounts << 10);
+    int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbsPer1024Ms,
+            ((deltaAngInLsbs << 10) / 100 + 5) / 10);
+
     int32_t leftOutput = (posOutput - rotOutput) / (1 << 20);
     int32_t rightOutput = (posOutput + rotOutput) / (1 << 20);
+
+    leftOutput = AdjustRegOutput(leftOutput);
+    rightOutput = AdjustRegOutput(rightOutput);
 
     if (state == ENABLE)
         Motors_SetPwm(leftOutput, rightOutput);
 }
 
-void TestOpenLoop(int16_t pwmL, int16_t pwmR)
+int32_t SpeedCtl_GetVTransInMmPerS(void)
+{
+    return currentVTransInMmPerS;
+}
+
+int32_t SpeedCtl_GetVRotInDegPerS(void)
+{
+    return currentVRotInDegPerS;
+}
+
+static void TestOpenLoop(int16_t pwmL, int16_t pwmR)
 {
     struct IMU_Data imuData;
     int32_t dl, dr, dp;
@@ -130,17 +132,6 @@ void TestOpenLoop(int16_t pwmL, int16_t pwmR)
     }
     Motors_SetPwm(0, 0);
 }
-
-int32_t SpeedCtl_GetActualTransSpeed(void)
-{
-    return currentVTransInMmPerS;
-}
-
-int32_t SpeedCtl_GetActualRotSpeed(void)
-{
-    return currentVRotInDegPerS;
-}
-
 
 //~ void Controller_Update(void)
 //~ {
@@ -171,10 +162,11 @@ static int execute(int argc, char *argv[])
     if (!strcmp(argv[0], "set")) {
         if (argc != 5)
             return -1;
-        transKp = atol(argv[1]);
-        transKd = atol(argv[2]);
-        rotKp = atol(argv[3]);
-        rotKd = atol(argv[4]);
+        int32_t vTransKp = atol(argv[1]);
+        int32_t vTransKi = atol(argv[2]);
+        int32_t vRotKp = atol(argv[3]);
+        int32_t vRotKi = atol(argv[4]);
+        SpeedCtl_Setup(vTransKp, vTransKi, vRotKp, vRotKi);
     }
     else if (!strcmp(argv[0], "test")) {
         if (argc != 3)
@@ -204,7 +196,8 @@ static int execute(int argc, char *argv[])
         if (argc != 2)
             return -1;
 
-        SpeedCtl_SetState((FunctionalState)!!atoi(argv[1]));
+        FunctionalState newState = (FunctionalState)!!atoi(argv[1]);
+        SpeedCtl_SetState(newState);
     }
     else {
         return -2;

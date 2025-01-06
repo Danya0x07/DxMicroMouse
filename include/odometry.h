@@ -1,5 +1,5 @@
-#ifndef INC_ODOMETRY_H
-#define INC_ODOMETRY_H
+#ifndef _INC_ODOMETRY_H
+#define _INC_ODOMETRY_H
 
 #include "module.h"
 
@@ -9,4 +9,4 @@ void Odometry_Get(float *x, float *y, float *ang);
 
 extern struct Module Odometry_module;
 
-#endif // INC_ODOMETRY_H
+#endif // _INC_ODOMETRY_H

@@ -485,3 +485,17 @@ volatile void *memcpy_n2v(volatile void *_dest, const void *_src, uint16_t n)
     }
     return dest;
 }
+
+__attribute__((interrupt("WCH-Interrupt-fast")))
+void NMI_Handler(void)
+{
+
+}
+
+__attribute__((interrupt("WCH-Interrupt-fast")))
+void HardFault_Handler(void)
+{
+    for (;;) {
+
+    }
+}
