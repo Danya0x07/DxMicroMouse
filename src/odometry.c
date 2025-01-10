@@ -5,8 +5,9 @@
 
 struct Odometry {
     int64_t lsbAng;
+    int64_t countsX, countsY;
+    int32_t degAng;
     int32_t vTransInCountsPerS, vRotInImuUnitsPerS;
-    int32_t countsX, countsY, degAng;
 };
 
 static struct Odometry odometry;
@@ -25,14 +26,14 @@ void Odometry_Update(int32_t transInCounts, int32_t deltaAngInMimuUnits)
     odometry.degAng = ((odometry.lsbAng * 2000 / 32768) / 100 + 5) / 10;
     odometry.degAng = NormalizeAngleDegrees(odometry.degAng);
 
-    odometry.countsY += transInCounts * Cos1000(odometry.degAng) / 1000;
-    odometry.countsX += transInCounts * -Sin1000(odometry.degAng) / 1000;
+    odometry.countsY += transInCounts * Cos100000(odometry.degAng);
+    odometry.countsX += transInCounts * -Sin100000(odometry.degAng);
 }
 
 void Odometry_GetPosition(int32_t *mmX, int32_t *mmY, int32_t *degAng)
 {
-    *mmX = odometry.countsX / COUNTS_PER_MM;
-    *mmY = odometry.countsY / COUNTS_PER_MM;
+    *mmX = (odometry.countsX / (COUNTS_PER_MM * 10000) + 5) / 10;
+    *mmY = (odometry.countsY / (COUNTS_PER_MM * 10000) + 5) / 10;
     *degAng = odometry.degAng;
 }
 

@@ -1,8 +1,8 @@
 #include "encoders.h"
-#include <stdio.h>
 #include <as5048.h>
 #include "telemetry.h"
 #include "mcu.h"
+#include <string.h>
 
 static volatile int32_t currentCountsLeft, currentCountsRight;
 static volatile int32_t prevCountsLeft, prevCountsRight;
@@ -134,7 +134,18 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     Encoders_GetDelta(&deltaLeft, &deltaRight);
 
     snprintf(out, TELEMETRY_STRING_SIZE,
-            "L:%-10ld\tR:%-10ld\tL:%-10ld\tR:%-10ld\n", left, right, deltaLeft, deltaRight);
+            "L:%-10ld\tR:%-10ld\tdL:%-10ld\tdR:%-10ld\n", left, right, deltaLeft, deltaRight);
+}
+
+static int execute(int argc, char *argv[])
+{
+    if (argc < 1)
+        return -1;
+
+    if (!strcmp(argv[0], "rst")) {
+        Encoders_Reset();
+    }
+    return 0;
 }
 
 static struct TelemetryControlBlock telemetryControlBlock = {
@@ -144,6 +155,6 @@ static struct TelemetryControlBlock telemetryControlBlock = {
 
 struct Module Encoders_module = {
     .name = "encoders",
-    .execute = NULL,
+    .execute = execute,
     .telemetry = &telemetryControlBlock
 };

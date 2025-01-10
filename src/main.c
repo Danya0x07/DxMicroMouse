@@ -58,15 +58,15 @@ int main(void)
     }
 
     SPI_SetSpeedToNormal();
-
     Sensors_SetLightening(DISABLE);
-    Odometry_Reset();
-    SpeedCtl_Setup(10000, 1000, 100000, 3000);
-    Button_EnableInterrupt();
-
-    printf("======= INITIALIZATION FINISHED =======\n");
     Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 100);
+
+    Odometry_Reset();
     SpeedCtl_Reset();
+    SpeedCtl_Setup(10000, 1000, 100000, 3000);
+    SpeedCtl_SetState(ENABLE);
+    Button_EnableInterrupt();
+    printf("======= INITIALIZATION FINISHED =======\n");
 
     for (;;) {
         Shell_Spin();

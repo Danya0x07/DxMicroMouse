@@ -8,19 +8,24 @@ static volatile uint16_t currentValues[5];
 static void update(void)
 {
     uint16_t rawValues[5] = {0};
+    uint16_t frontLightValue, frontDarkValue;
 
     Emitters_LeftFrontOn();
     Emitters_RightFrontOn();
     Micros_Wait(60);
     rawValues[ReceiverChannel_LeftFront] = Receivers_ReadChannel(ReceiverChannel_LeftFront);
     rawValues[ReceiverChannel_RightFront] = Receivers_ReadChannel(ReceiverChannel_RightFront);
-    rawValues[ReceiverChannel_Front] = Receivers_ReadChannel(ReceiverChannel_Front);
+    frontLightValue = Receivers_ReadChannel(ReceiverChannel_Front);
     Emitters_LeftFrontOff();
     Emitters_RightFrontOff();
     Micros_Wait(60);
     rawValues[ReceiverChannel_LeftFront] -= Receivers_ReadChannel(ReceiverChannel_LeftFront);
     rawValues[ReceiverChannel_RightFront] -= Receivers_ReadChannel(ReceiverChannel_RightFront);
-    rawValues[ReceiverChannel_Front] -= Receivers_ReadChannel(ReceiverChannel_Front);
+
+    frontDarkValue = Receivers_ReadChannel(ReceiverChannel_Front);
+    if (frontDarkValue > frontLightValue)
+        frontDarkValue = frontLightValue;
+    rawValues[ReceiverChannel_Front] = frontLightValue - frontDarkValue;
 
     Emitters_LeftSideOn();
     Emitters_RightSideOn();

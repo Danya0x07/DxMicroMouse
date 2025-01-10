@@ -11,7 +11,7 @@
 
 #define MIN_OUTPUT_THRESHOLD    50
 
-static FunctionalState state = ENABLE;
+static FunctionalState state = DISABLE;
 
 static int32_t targetVTransInCountsPerS, targetVRotInLsbs;
 static struct Regulator vTransRegulator, vRotRegulator;
@@ -20,6 +20,7 @@ void SpeedCtl_Reset(void)
 {
     Regulator_Reset(&vTransRegulator);
     Regulator_Reset(&vRotRegulator);
+    Encoders_Reset();
 }
 
 void SpeedCtl_SetState(FunctionalState newState)
@@ -87,11 +88,11 @@ void SpeedCtl_Update(void)
 
     Odometry_Update(transInCounts, deltaAngInMimuUnits);
 
-    int64_t posOutput = Regulator_Output(&vTransRegulator, targetVTransInCountsPerS, transInCounts * 1000);
+    int64_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInCountsPerS, transInCounts * 1000);
     int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
 
-    int32_t leftOutput = ((posOutput - rotOutput) / 100000 + 5) / 10;
-    int32_t rightOutput = ((posOutput + rotOutput) / 100000 + 5) / 10;
+    int32_t leftOutput = ((transOutput - rotOutput) / 100000 + 5) / 10;
+    int32_t rightOutput = ((transOutput + rotOutput) / 100000 + 5) / 10;
 
     leftOutput = AdjustRegOutput(leftOutput);
     rightOutput = AdjustRegOutput(rightOutput);

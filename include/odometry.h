@@ -3,9 +3,7 @@
 
 #include "module.h"
 
-#define ENCODER_RESOLUTION  12
-#define WHEEL_DIAMETER  21
-#define COUNTS_PER_MM    60 // ((float)(1 << ENCODER_RESOLUTION) / (WHEEL_DIAMETER * M_PI))
+#define COUNTS_PER_MM    60
 
 void Odometry_Reset(void);
 void Odometry_Update(int32_t transInCounts, int32_t deltaAngInMimuUnits);
