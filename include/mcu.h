@@ -84,10 +84,10 @@
 #define BATTERY_PIN     GPIO_Pin_0
 #define BATTERY_CH      ADC_Channel_0
 
-#define MOTOR_FREQ  100000
-#define MOTOR_PWM_MAX    360
+#define MOTOR_FREQ  20000
+#define MOTOR_PWM_MAX    3600
 
-#define FAN_PWM_MAX 150
+#define FAN_PWM_MAX 360
 
 extern RCC_ClocksTypeDef MCU_rccClocks;
 extern volatile uint32_t MCU_millis;

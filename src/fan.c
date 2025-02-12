@@ -20,7 +20,6 @@ void Fan_SetPwm(uint16_t pwm)
 }
 
 #else
-#error "Fan motor is 4.2V maximum rated, we are using 8.4V maximum voltage."
 
 void Fan_On(void)
 {

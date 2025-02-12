@@ -553,13 +553,13 @@ void MPU6500_GetOffset(struct MPU6500_SensorData *offset)
     offset->gyroZ = (int16_t)buff[0] << 8 | buff[1];
 
     ReadBuffer(REG_XA_OFFSET_H, buff, sizeof(buff));
-    offset->accelX = ((int16_t)buff[0] << 8 | buff[1]) >> 1;
+    offset->accelX = (int16_t)buff[0] << 8 | buff[1];
 
     ReadBuffer(REG_YA_OFFSET_H, buff, sizeof(buff));
-    offset->accelY = ((int16_t)buff[0] << 8 | buff[1]) >> 1;
+    offset->accelY = (int16_t)buff[0] << 8 | buff[1];
 
     ReadBuffer(REG_ZA_OFFSET_H, buff, sizeof(buff));
-    offset->accelZ = ((int16_t)buff[0] << 8 | buff[1]) >> 1;
+    offset->accelZ = (int16_t)buff[0] << 8 | buff[1];
 
     offset->temp = 0;
 }
@@ -576,18 +576,18 @@ void MPU6500_SetOffset(const struct MPU6500_SensorData *offset)
     buff[5] = (uint8_t)(offset->gyroZ & 0xFF);
     WriteBuffer(REG_XG_OFFSET_H, buff, sizeof(buff));
 
-    buff[0] = (uint8_t)(offset->accelX >> 7);
-    buff[1] = (uint8_t)(offset->accelX << 1);
-    buff[2] = (uint8_t)(offset->accelY >> 7);
-    buff[3] = (uint8_t)(offset->accelY << 1);
-    buff[4] = (uint8_t)(offset->accelZ >> 7);
-    buff[5] = (uint8_t)(offset->accelZ << 1);
+    buff[0] = (uint8_t)(offset->accelX >> 8);
+    buff[1] = (uint8_t)(offset->accelX & 0xFF);
+    buff[2] = (uint8_t)(offset->accelY >> 8);
+    buff[3] = (uint8_t)(offset->accelY & 0xFF);
+    buff[4] = (uint8_t)(offset->accelZ >> 8);
+    buff[5] = (uint8_t)(offset->accelZ & 0xFF);
     WriteRegister(REG_XA_OFFSET_H, buff[0]);
-    WriteBits(REG_XA_OFFSET_L, 0xFE, buff[1]);
+    WriteBits(REG_XA_OFFSET_L, 0xFE, buff[1] & 0xFE);
     WriteRegister(REG_YA_OFFSET_H, buff[2]);
-    WriteBits(REG_YA_OFFSET_L, 0xFE, buff[3]);
+    WriteBits(REG_YA_OFFSET_L, 0xFE, buff[3] & 0xFE);
     WriteRegister(REG_ZA_OFFSET_H, buff[4]);
-    WriteBits(REG_ZA_OFFSET_L, 0xFE, buff[5]);
+    WriteBits(REG_ZA_OFFSET_L, 0xFE, buff[5] & 0xFE);
 }
 
 void MPU6500_ConfigureAuxMaster(const struct MPU6500_AuxMasterConfiguration *cfg)

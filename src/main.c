@@ -51,7 +51,11 @@ int main(void)
     }
     Encoders_Reset();
 
-    if ((retcode = IMU_Init()) != 0) {
+    IMU_Init(ImuConfiguration_TEST);
+    IMU_Test();
+    IMU_Init(ImuConfiguration_CALIBRATION);
+    IMU_Calibrate(5);
+    if ((retcode = IMU_Init(ImuConfiguration_APP)) != 0) {
         printf("IMU retcode: %d\n", retcode);
         Buzzer_Sing((uint16_t []){1200, 800}, 2, 100);
         LED0_Blink(3, 200);
@@ -63,8 +67,8 @@ int main(void)
 
     Odometry_Reset();
     SpeedCtl_Reset();
-    SpeedCtl_Setup(10000, 1000, 100000, 3000);
-    SpeedCtl_SetState(ENABLE);
+    SpeedCtl_Setup(7000, 15, 100000, 30000);
+    //SpeedCtl_SetState(ENABLE);
     Button_EnableInterrupt();
     printf("======= INITIALIZATION FINISHED =======\n");
 

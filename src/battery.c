@@ -20,18 +20,18 @@ void Battery_Update(void)
 BatteryStatus Battery_GetStatus(void)
 {
     /*
-     * 8.0 3680
-     * 7.4 3391
-     * 7.1 3292
-     * 6.4 2963
-     * 5.8 2660
+     * 4.0 3900
+     * 3.8 3800
+     * 3.6 3550
+     * 3.5 3450
+     * 3.3 3300
      */
     const uint16_t thresholds[5] = {
-        [BatteryStatus_DEAD]    = 2660,
-        [BatteryStatus_LOW]     = 2963,
-        [BatteryStatus_MEDIUM]  = 3292,
-        [BatteryStatus_HIGH]    = 3391,
-        [BatteryStatus_FULL]    = 3680
+        [BatteryStatus_DEAD]    = 3300,
+        [BatteryStatus_LOW]     = 3450,
+        [BatteryStatus_MEDIUM]  = 3550,
+        [BatteryStatus_HIGH]    = 3800,
+        [BatteryStatus_FULL]    = 3900
     };
 
     uint16_t level = batteryLevel;

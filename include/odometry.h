@@ -3,7 +3,7 @@
 
 #include "module.h"
 
-#define COUNTS_PER_MM    60
+#define COUNTS_PER_MM    62
 
 void Odometry_Reset(void);
 void Odometry_Update(int32_t transInCounts, int32_t deltaAngInMimuUnits);

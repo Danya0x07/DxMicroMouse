@@ -32,8 +32,8 @@ void Odometry_Update(int32_t transInCounts, int32_t deltaAngInMimuUnits)
 
 void Odometry_GetPosition(int32_t *mmX, int32_t *mmY, int32_t *degAng)
 {
-    *mmX = (odometry.countsX / (COUNTS_PER_MM * 10000) + 5) / 10;
-    *mmY = (odometry.countsY / (COUNTS_PER_MM * 10000) + 5) / 10;
+    *mmX = odometry.countsX / (COUNTS_PER_MM * 100000 + 2500);
+    *mmY = odometry.countsY / (COUNTS_PER_MM * 100000 + 2500);
     *degAng = odometry.degAng;
 }
 

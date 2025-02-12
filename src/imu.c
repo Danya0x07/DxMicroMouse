@@ -4,6 +4,8 @@
 #include "leds.h"
 #include <stdlib.h>
 
+#define CALIB_BUFFSIZE  1000
+
 static const uint16_t mpu6500SelfTestTable[256] = {
     2620,2646,2672,2699,2726,2753,2781,2808,
     2837,2865,2894,2923,2952,2981,3011,3041,
@@ -40,8 +42,77 @@ static const uint16_t mpu6500SelfTestTable[256] = {
 };
 
 static volatile struct IMU_Data currentData;
+static struct MPU6500_SensorData sensorOffset;
 
-int IMU_Init(void)
+struct ImuAverage {
+    int32_t aX, aY, aZ;
+    int32_t gX, gY, gZ;
+};
+typedef struct ImuAverage ImuDeviation;
+
+static void GetAverages(struct ImuAverage *avg, uint16_t numToAverage, uint16_t numToSkip)
+{
+    struct MPU6500_SensorData sensorData;
+    int32_t avgAccelX = 0, avgAccelY = 0, avgAccelZ = 0, avgGyroX = 0, avgGyroY = 0, avgGyroZ = 0;
+
+    for (int i = 0; i < numToSkip + numToAverage; i++) {
+        MPU6500_GetSensorData(&sensorData);
+        Micros_WaitMillis(2);
+        if (i < numToSkip)
+            continue;
+        avgAccelX += sensorData.accelX;
+        avgAccelY += sensorData.accelY;
+        avgAccelZ += sensorData.accelZ;
+        avgGyroX += sensorData.gyroX;
+        avgGyroY += sensorData.gyroY;
+        avgGyroZ += sensorData.gyroZ;
+    }
+    avg->aX = avgAccelX / numToAverage;
+    avg->aY = avgAccelY / numToAverage;
+    avg->aZ = avgAccelZ / numToAverage;
+    avg->gX = avgGyroX / numToAverage;
+    avg->gY = avgGyroY / numToAverage;
+    avg->gZ = avgGyroZ / numToAverage;
+}
+
+static void GetDeviationFromFactoryTrim(const struct ImuAverage *testOn,
+                                        const struct ImuAverage *testOff,
+                                        ImuDeviation *deviation)
+{
+    struct MPU6500_SelfTestData selfTestData;
+    MPU6500_GetSelfTestData(&selfTestData);
+
+    const int32_t factoryTrimAccelX = mpu6500SelfTestTable[selfTestData.accelX];
+    const int32_t factoryTrimAccelY = mpu6500SelfTestTable[selfTestData.accelY];
+    const int32_t factoryTrimAccelZ = mpu6500SelfTestTable[selfTestData.accelZ];
+    const int32_t factoryTrimGyroX = mpu6500SelfTestTable[selfTestData.gyroX];
+    const int32_t factoryTrimGyroY = mpu6500SelfTestTable[selfTestData.gyroY];
+    const int32_t factoryTrimGyroZ = mpu6500SelfTestTable[selfTestData.gyroZ];
+
+    deviation->aX = 100L * (testOn->aX - testOff->aX - factoryTrimAccelX) / factoryTrimAccelX;
+    deviation->aY = 100L * (testOn->aY - testOff->aY - factoryTrimAccelY) / factoryTrimAccelY;
+    deviation->aZ = 100L * (testOn->aZ - testOff->aZ - factoryTrimAccelZ) / factoryTrimAccelZ;
+    deviation->gX = 100L * (testOn->gX - testOff->gX - factoryTrimGyroX) / factoryTrimGyroX;
+    deviation->gY = 100L * (testOn->gY - testOff->gY - factoryTrimGyroY) / factoryTrimGyroY;
+    deviation->gZ = 100L * (testOn->gZ - testOff->gZ - factoryTrimGyroZ) / factoryTrimGyroZ;
+}
+
+static void ApplyOffsetsByAverage(const struct ImuAverage *avg)
+{
+    MPU6500_GetOffset(&sensorOffset);
+
+    sensorOffset.accelX -= (int16_t)avg->aX;
+    sensorOffset.accelY -= (int16_t)avg->aY;
+    //~ sensorOffset.accelZ -= (int16_t)(avg->aZ > 0 ? avg->aZ + 2048 : avg->aZ - 2048);
+    sensorOffset.accelZ -= (int16_t)avg->aZ;
+    sensorOffset.gyroX = -(int16_t)avg->gX;
+    sensorOffset.gyroY = -(int16_t)avg->gY;
+    sensorOffset.gyroZ = -(int16_t)avg->gZ;
+
+    MPU6500_SetOffset(&sensorOffset);
+}
+
+int IMU_Init(enum ImuConfiguration configuration)
 {
     int retcode = 0;
 
@@ -59,14 +130,14 @@ int IMU_Init(void)
             .writeSlave0 = false
         },
         .fsyncPosition = MPU6500_FSYNCPOS_DISABLED,
-        .gyro = { // Self-test configuration
-            .bandwidth = MPU6500_GYRO_BANDWIDTH_92Hz_3Ms9,
-            .range = MPU6500_GYRO_RANGE_250DPS
+        .gyro = {
+            .bandwidth = MPU6500_GYRO_BANDWIDTH_250Hz_0Ms97,
+            .range = MPU6500_GYRO_RANGE_2000DPS
         },
-        .accel = { // Self-test configuration
-            .bandwidth = MPU6500_ACCEL_BANDWIDTH_92Hz_7Ms8,
+        .accel = {
+            .bandwidth = MPU6500_ACCEL_BANDWIDTH_460Hz_1Ms94,
             .lpfrequency = MPU6500_ACCEL_LPFREQUENCY_250Hz,
-            .range = MPU6500_ACCEL_RANGE_2G
+            .range = MPU6500_ACCEL_RANGE_4G
         }
     };
     const struct MPU6500_InterruptPinConfiguration intPinConfig = {
@@ -77,8 +148,27 @@ int IMU_Init(void)
         .fsyncTransitionInterrupt = false,
         .fsyncActiveLevelLow = false
     };
+    const struct MPU6500_InterruptConfiguration intConfig = {
+        .wakeOnMotion = DISABLE,
+        .fifoOverflow = DISABLE,
+        .fsyncTransition = DISABLE,
+        .rawDataReady = ENABLE
+    };
 
     SysTick_DisableInterrupt();
+
+    if (configuration == ImuConfiguration_CALIBRATION) {
+        config.gyro.bandwidth = MPU6500_GYRO_BANDWIDTH_250Hz_0Ms97;
+        config.gyro.range = MPU6500_GYRO_RANGE_1000DPS;
+        config.accel.bandwidth = MPU6500_ACCEL_BANDWIDTH_1130Hz_0Ms75;
+        config.accel.range = MPU6500_ACCEL_RANGE_16G;
+    }
+    else if (configuration == ImuConfiguration_TEST) {
+        config.gyro.bandwidth = MPU6500_GYRO_BANDWIDTH_92Hz_3Ms9;
+        config.gyro.range = MPU6500_GYRO_RANGE_250DPS;
+        config.accel.bandwidth = MPU6500_ACCEL_BANDWIDTH_92Hz_7Ms8;
+        config.accel.range = MPU6500_ACCEL_RANGE_2G;
+    }
 
     // Perform reset
     MPU6500_ResetDevice();
@@ -97,122 +187,77 @@ int IMU_Init(void)
     MPU6500_ConfigureInterruptPin(&intPinConfig);
     MPU6500_SetPowerMode(MPU6500_PowerMode_6AXIS);
     MPU6500_SetClockSource(MPU6500_ClockSource_AUTOPLL);
+    MPU6500_ConfigureInterrupt(&intConfig);
+
+    if (configuration == ImuConfiguration_APP) {
+        // TODO: Load offsets from eeprom
+        MPU6500_SetOffset(&sensorOffset);
+    }
     Micros_WaitMillis(100);
 
-    // Perform self-test
+    SysTick_EnableInterrupt();
+    return retcode;
+}
+
+int IMU_Test(void)
+{
+    int retcode = 0;
+    struct ImuAverage testOn, testOff;
+
+    SysTick_DisableInterrupt();
     LED1_ON();
-
-    struct MPU6500_SensorData sensorData;
-    int32_t avgAccelX = 0, avgAccelY = 0, avgAccelZ = 0, avgGyroX = 0, avgGyroY = 0, avgGyroZ = 0;
-
-    for (int i = 0; i < 200; i++) {
-        MPU6500_GetSensorData(&sensorData);
-        avgAccelX += sensorData.accelX;
-        avgAccelY += sensorData.accelY;
-        avgAccelZ += sensorData.accelZ;
-        avgGyroX += sensorData.gyroX;
-        avgGyroY += sensorData.gyroY;
-        avgGyroZ += sensorData.gyroZ;
-        Micros_Wait(1000);
-    }
-    avgAccelX /= 200;
-    avgAccelY /= 200;
-    avgAccelZ /= 200;
-    avgGyroX /= 200;
-    avgGyroY /= 200;
-    avgGyroZ /= 200;
 
     MPU6500_SelfTestOn(
         MPU6500_SELFTEST_XA | MPU6500_SELFTEST_YA | MPU6500_SELFTEST_ZA
         | MPU6500_SELFTEST_XG | MPU6500_SELFTEST_YG | MPU6500_SELFTEST_ZG
     );
-    Micros_Wait(25000);
-
-    int32_t testAccelX = 0, testAccelY = 0, testAccelZ = 0, testGyroX = 0, testGyroY = 0, testGyroZ = 0;
-
-    for (int i = 0; i < 200; i++) {
-        MPU6500_GetSensorData(&sensorData);
-        testAccelX += sensorData.accelX;
-        testAccelY += sensorData.accelY;
-        testAccelZ += sensorData.accelZ;
-        testGyroX += sensorData.gyroX;
-        testGyroY += sensorData.gyroY;
-        testGyroZ += sensorData.gyroZ;
-        Micros_Wait(1000);
-    }
-    testAccelX /= 200;
-    testAccelY /= 200;
-    testAccelZ /= 200;
-    testGyroX /= 200;
-    testGyroY /= 200;
-    testGyroZ /= 200;
+    Micros_WaitMillis(25);
+    GetAverages(&testOn, 1000, 100);
 
     MPU6500_SelfTestOff();
-    LED1_OFF();
+    Micros_WaitMillis(25);
+    GetAverages(&testOff, 1000, 100);
 
-    struct MPU6500_SelfTestData selfTestData;
-    MPU6500_GetSelfTestData(&selfTestData);
+    ImuDeviation deviation;
+    GetDeviationFromFactoryTrim(&testOn, &testOff, &deviation);
 
-    const int32_t factoryTrimGyroX = mpu6500SelfTestTable[selfTestData.gyroX];
-    const int32_t factoryTrimGyroY = mpu6500SelfTestTable[selfTestData.gyroY];
-    const int32_t factoryTrimGyroZ = mpu6500SelfTestTable[selfTestData.gyroZ];
-    const int32_t factoryTrimAccelX = mpu6500SelfTestTable[selfTestData.accelX];
-    const int32_t factoryTrimAccelY = mpu6500SelfTestTable[selfTestData.accelY];
-    const int32_t factoryTrimAccelZ = mpu6500SelfTestTable[selfTestData.accelZ];
-    const int32_t changeAccelX = 100L * (testAccelX - avgAccelX - factoryTrimAccelX) / factoryTrimAccelX;
-    const int32_t changeAccelY = 100L * (testAccelY - avgAccelY - factoryTrimAccelY) / factoryTrimAccelY;
-    const int32_t changeAccelZ = 100L * (testAccelZ - avgAccelZ - factoryTrimAccelZ) / factoryTrimAccelZ;
-    const int32_t changeGyroX = 100L * (testGyroX - avgGyroX - factoryTrimGyroX) / factoryTrimGyroX;
-    const int32_t changeGyroY = 100L * (testGyroY - avgGyroY - factoryTrimGyroY) / factoryTrimGyroY;
-    const int32_t changeGyroZ = 100L * (testGyroZ - avgGyroZ - factoryTrimGyroZ) / factoryTrimGyroZ;
-
-    printf("MPU6500 change from factory trim:\n");
-    printf("gX:%ld%%\tgY:%ld%%\tgZ:%ld%%\taX:%ld%%\taY:%ld%%\taZ:%ld%%\n",
-        changeGyroX, changeGyroY, changeGyroZ,
-        changeAccelX, changeAccelY, changeAccelZ
+    printf("MPU6500 factory trim deviation:\n");
+    printf("aX:%ld%%\taY:%ld%%\taZ:%ld%%\tgX:%ld%%\tgY:%ld%%\tgZ:%ld%%\n",
+        deviation.aX, deviation.aY, deviation.aZ,
+        deviation.gX, deviation.gY, deviation.gZ
     );
-    if (changeGyroX > 10 || changeGyroY > 10 || changeGyroZ > 10
-            || changeAccelX > 10 || changeAccelY > 10 || changeAccelZ > 10) {
+    if (deviation.aX > 10 || deviation.aY > 10 || deviation.aZ > 10
+            || deviation.gX > 10 || deviation.gY > 10 || deviation.gZ > 10) {
         retcode = -2;
     }
 
-    // Check offsets
-    MPU6500_GetOffset(&sensorData);
-    // Convert to range +-16g and +-1000 dps
-    sensorData.accelX -= (int16_t)((avgAccelX / 8) + 1) / 2;
-    sensorData.accelY -= (int16_t)((avgAccelY / 8) + 1) / 2;
-    avgAccelZ = avgAccelZ > 0 ? avgAccelZ - 16384 : avgAccelZ + 16384;
-    sensorData.accelZ -= (int16_t)((avgAccelZ / 8) + 1) / 2;
-    sensorData.gyroX = -(int16_t)((avgGyroX / 2) + 1) / 2;
-    sensorData.gyroY = -(int16_t)((avgGyroY / 2) + 1) / 2;
-    sensorData.gyroZ = -(int16_t)((avgGyroZ / 2) + 1) / 2;
-    MPU6500_SetOffset(&sensorData);
-    printf("MPU6500 calculated offsets:\n");
-    printf("gX:%-5d\tgY:%-5d\tgZ:%-5d\taX:%-5d\taY:%-5d\taZ:%-5d\n",
-        sensorData.gyroX, sensorData.gyroY, sensorData.gyroZ,
-        sensorData.accelX, sensorData.accelY, sensorData.accelZ
-    );
-
-    // Application config
-    config.gyro.bandwidth = MPU6500_GYRO_BANDWIDTH_250Hz_0Ms97;
-    config.gyro.range = MPU6500_GYRO_RANGE_2000DPS;
-    config.accel.bandwidth = MPU6500_ACCEL_BANDWIDTH_184Hz_5Ms8;
-    config.accel.range = MPU6500_ACCEL_RANGE_4G;
-    MPU6500_Configure(&config);
-    Micros_Wait(25000);
-
-    // Configure interrupt
-    const struct MPU6500_InterruptConfiguration intConfig = {
-        .wakeOnMotion = DISABLE,
-        .fifoOverflow = DISABLE,
-        .fsyncTransition = DISABLE,
-        .rawDataReady = ENABLE
-    };
-
-    MPU6500_ConfigureInterrupt(&intConfig);
-
+    LED1_OFF();
     SysTick_EnableInterrupt();
+
     return retcode;
+}
+
+void IMU_Calibrate(unsigned numIterations)
+{
+    SysTick_DisableInterrupt();
+    LED1_ON();
+
+    struct ImuAverage avg;
+    GetAverages(&avg, 1000, 100);
+
+    for (unsigned i = 1; i <= numIterations; i++) {
+        ApplyOffsetsByAverage(&avg);
+        GetAverages(&avg, 1000, 100);
+
+        printf("MPU6500 averages, iteration %d:\n", i);
+        printf("aX:%ld\taY:%ld\taZ:%ld\tgX:%ld\tgY:%ld\tgZ:%ld\n",
+            avg.aX, avg.aY, avg.aZ,
+            avg.gX, avg.gY, avg.gZ
+        );
+    }
+
+    LED1_OFF();
+    SysTick_EnableInterrupt();
 }
 
 void IMU_Update(void)

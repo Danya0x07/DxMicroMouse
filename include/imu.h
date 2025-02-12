@@ -12,7 +12,15 @@ struct IMU_Data {
     int16_t gyroZ;
 };
 
-int IMU_Init(void);
+enum ImuConfiguration {
+    ImuConfiguration_APP,
+    ImuConfiguration_CALIBRATION,
+    ImuConfiguration_TEST
+};
+
+int IMU_Init(enum ImuConfiguration configuration);
+int IMU_Test(void);
+void IMU_Calibrate(unsigned numIterations);
 void IMU_Update(void);
 void IMU_GetData(struct IMU_Data *data);
 
