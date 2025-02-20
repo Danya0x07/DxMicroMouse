@@ -54,3 +54,36 @@ void Buzzer_Sing(uint16_t *freqs, uint16_t len, uint16_t duration)
         Buzzer_Stop();
     }
 }
+
+static uint32_t endTime;
+
+void Buzzer_BeepAsync(uint16_t freq, uint16_t duration)
+{
+    Buzzer_SetFrequency(freq);
+    endTime = Millis_Get() + duration;
+}
+
+void Buzzer_Update(void)
+{
+    if (Millis_Get() >= endTime)
+        Buzzer_Stop();
+}
+
+static int execute(int argc, char *argv[])
+{
+    if (argc != 3)
+        return -1;
+
+    unsigned times = atoi(argv[0]);
+    unsigned freq = atoi(argv[1]);
+    unsigned duration = atoi(argv[2]);
+    Buzzer_Blink(times, freq, duration);
+
+    return 0;
+}
+
+struct Module Buzzer_module = {
+    .name = "bz",
+    .execute = execute,
+    .telemetry = NULL
+};

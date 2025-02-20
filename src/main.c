@@ -25,6 +25,7 @@ struct Module *modules[] = {
     &Battery_module,
     &SpeedCtl_module,
     &Odometry_module,
+    &Buzzer_module,
     NULL
 };
 
@@ -90,6 +91,7 @@ void SysTick_Handler(void)
     IMU_Update();
     MEMORY_UNHOLD_TRANSACTION();
     Battery_Update();
+    Buzzer_Update();
 
     SpeedCtl_Update();
 }
