@@ -64,7 +64,7 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     snprintf(out, TELEMETRY_STRING_SIZE, "L:%d\tR:%d\n", pwmLeft, pwmRight);
 }
 
-static struct TelemetryControlBlock telemetryControlBlock = {
+static struct ModuleTelemetry telemetry = {
     .interval = 50,
     .write = WriteTelemetry
 };
@@ -72,5 +72,5 @@ static struct TelemetryControlBlock telemetryControlBlock = {
 struct Module Motors_module = {
     .name = "motors",
     .execute = execute,
-    .telemetry = &telemetryControlBlock
+    .telemetry = &telemetry
 };

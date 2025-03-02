@@ -3,6 +3,7 @@
 #include <mpu6500.h>
 #include "leds.h"
 #include <stdlib.h>
+#include <string.h>
 
 #define CALIB_BUFFSIZE  1000
 
@@ -42,7 +43,7 @@ static const uint16_t mpu6500SelfTestTable[256] = {
 };
 
 static volatile struct IMU_Data currentData;
-static struct MPU6500_SensorData sensorOffset;
+static struct MPU6500_SensorData sensorOffset = {0};
 
 struct ImuAverage {
     int32_t aX, aY, aZ;
@@ -190,7 +191,6 @@ int IMU_Init(enum ImuConfiguration configuration)
     MPU6500_ConfigureInterrupt(&intConfig);
 
     if (configuration == ImuConfiguration_APP) {
-        // TODO: Load offsets from eeprom
         MPU6500_SetOffset(&sensorOffset);
     }
     Micros_WaitMillis(100);
@@ -282,6 +282,32 @@ void IMU_GetData(struct IMU_Data *data)
     SysTick_EnableInterrupt();
 }
 
+static int execute(int argc, char *argv[])
+{
+    if (argc != 1)
+        return -1;
+
+    if (!strcmp(argv[0], "cal")) {
+        IMU_Init(ImuConfiguration_CALIBRATION);
+        IMU_Calibrate(5);
+    }
+    else if (!strcmp(argv[0], "tst")) {
+        IMU_Init(ImuConfiguration_TEST);
+        IMU_Test();
+    }
+    else if (!strcmp(argv[0], "ps")) {
+        printf("IMU offsets:\n"
+               "Accel: %d %d %d\n"
+               "Gyro: %d %d %d\n",
+               sensorOffset.accelX, sensorOffset.accelY, sensorOffset.accelZ,
+               sensorOffset.gyroX, sensorOffset.gyroY, sensorOffset.gyroZ);
+    }
+    else
+        return -2;
+
+    return 0;
+}
+
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
     struct IMU_Data imuData;
@@ -294,13 +320,30 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     );
 }
 
-static struct TelemetryControlBlock telemetryControlBlock = {
+static struct ModuleTelemetry telemetry = {
     .interval = 200,
     .write = WriteTelemetry
 };
 
+static void load(const uint8_t *buffer)
+{
+    memcpy(&sensorOffset, buffer, sizeof(sensorOffset));
+}
+
+static void save(uint8_t *buffer)
+{
+    memcpy(buffer, &sensorOffset, sizeof(sensorOffset));
+}
+
+static struct ModuleSettings settings = {
+    .dataSize = sizeof(sensorOffset),
+    .load = load,
+    .save = save
+};
+
 struct Module IMU_module = {
     .name = "imu",
-    .execute = NULL,
-    .telemetry = &telemetryControlBlock
+    .execute = execute,
+    .telemetry = &telemetry,
+    .settings = &settings
 };

@@ -28,7 +28,6 @@ uint_fast16_t Floodfill_FindMinimumOpenNeighbor(struct MazeCell cell, struct Maz
 void Floodfill_RecomputeFromCell(struct MazeCell cell);
 
 /** Get coordinates of the cell the robot should move to if it is now at given cell
- * Return true if move should be performed, false otherwise.
  */
 struct MazeCell Floodfill_NextCell(struct MazeCell currentCell);
 

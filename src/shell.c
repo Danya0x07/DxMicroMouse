@@ -8,44 +8,6 @@
 #define MAX_WORDS_NUM   7
 #define MAX_WORD_LEN    12
 
-static void SendTelemetry(void)
-{
-    struct Module *m;
-
-    FOR_EACH_MODULE(addr) {
-        m = *addr;
-        if (m->telemetry)
-            Telemetry_Send(m->telemetry);
-    }
-}
-
-static void PrintModules(void)
-{
-    struct Module *m;
-
-    UART_SendString("Modules:\n");
-    FOR_EACH_MODULE(addr) {
-        m = *addr;
-        UART_SendString(m->name);
-        if (m->telemetry)
-            UART_SendChar('*');
-        UART_SendChar(' ');
-    }
-    UART_SendChar('\n');
-}
-
-static struct Module *FindModuleByName(const char *name)
-{
-    struct Module *m;
-
-    FOR_EACH_MODULE(addr) {
-        m = *addr;
-        if (!strcmp(name, m->name))
-            return m;
-    }
-    return NULL;
-}
-
 static int ParseWords(char *input, char (*words)[MAX_WORD_LEN], int maxNum)
 {
     int wordCount = 0;
@@ -85,11 +47,13 @@ static void HandleInput(void)
         argv[i] = &words[i + 1][0];
     }
 
-    struct Module *module = FindModuleByName(words[0]);
+    struct Module *module = Module_FindByName(words[0]);
 
     if (!module) {
         if (!strcmp(words[0], "?"))
-            PrintModules();
+            Modules_Print();
+        else if (!strcmp(words[0], "ss"))
+            Modules_SaveSettings();
         else
             printf("No such module %s\n", words[0]);
         return;
@@ -131,5 +95,5 @@ static void HandleInput(void)
 void Shell_Spin(void)
 {
     HandleInput();
-    SendTelemetry();
+    Modules_SendTelemetry();
 }

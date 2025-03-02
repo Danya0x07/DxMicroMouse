@@ -4,11 +4,11 @@
 #include "mcu.h"
 
 enum ReceiverChannel {
-    ReceiverChannel_LeftFront,
-    ReceiverChannel_LeftSide,
-    ReceiverChannel_RightSide,
-    ReceiverChannel_RightFront,
-    ReceiverChannel_Front,
+    ReceiverChannel_LF,
+    ReceiverChannel_LS,
+    ReceiverChannel_RS,
+    ReceiverChannel_RF,
+    ReceiverChannel_F,
 };
 
 uint16_t Receivers_ReadChannel(enum ReceiverChannel channel);

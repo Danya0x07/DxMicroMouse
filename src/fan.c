@@ -50,6 +50,5 @@ static int execute(int argc, char *argv[])
 
 struct Module Fan_module = {
     .name = "fan",
-    .execute = execute,
-    .telemetry = NULL
+    .execute = execute
 };

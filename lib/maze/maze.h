@@ -81,11 +81,29 @@ void Maze_WriteCellMetadata(struct MazeCell cell, uint16_t metadata);
 /// Read metadata (MAZEWALLSHIFT bits) of cell (x,y)
 uint16_t Maze_ReadCellMetadata(struct MazeCell cell);
 
+/// Get direction to one cell from another
+uint_fast8_t Maze_GetDirection(struct MazeCell from, struct MazeCell to);
+
+/// Get direction with respect to current facing direction
+uint_fast8_t Maze_GetRelativeDirection(uint_fast8_t facingDirection, uint_fast8_t globalDirection);
+
+/// Get direction opposite to given
+uint_fast8_t Maze_GetOppositeDirection(uint_fast8_t direction);
+
+/// Get cell that is next to given cell in given direction
+struct MazeCell Maze_GetNeighbor(struct MazeCell cell, uint_fast8_t direction);
+
 /** Print maze state.
  * printMeta should fill up to 5 bytes of the argument array (6th is for '\0') and return number of characters written.
  * meta[0..4] will be printed in first row in a cell when row == 0, in the second row when 1.
  * Pass NULL if this not needed.
  */
 void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char meta[6]));
+
+/// Serialize wall information to byte array of MAZEMAXLEN^2/2 elements
+void Maze_SerializeWalls(uint8_t *array);
+
+/// Deserialize wall information from array created before
+void Maze_DeserializeWalls(const uint8_t *array);
 
 #endif // _INC_MAZE_H

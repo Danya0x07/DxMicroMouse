@@ -1,6 +1,5 @@
 #include "encoders.h"
 #include <as5048.h>
-#include "telemetry.h"
 #include "mcu.h"
 #include <string.h>
 
@@ -148,7 +147,7 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static struct TelemetryControlBlock telemetryControlBlock = {
+static struct ModuleTelemetry telemetry = {
     .interval = 350,
     .write = WriteTelemetry
 };
@@ -156,5 +155,5 @@ static struct TelemetryControlBlock telemetryControlBlock = {
 struct Module Encoders_module = {
     .name = "encoders",
     .execute = execute,
-    .telemetry = &telemetryControlBlock
+    .telemetry = &telemetry
 };

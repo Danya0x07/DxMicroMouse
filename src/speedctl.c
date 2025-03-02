@@ -1,6 +1,5 @@
 #include "speedctl.h"
 #include "sensors.h"
-#include "receivers.h"
 #include "motors.h"
 #include "encoders.h"
 #include "imu.h"
@@ -8,18 +7,31 @@
 #include "odometry.h"
 #include <stdlib.h>
 #include <string.h>
-
-#define MIN_OUTPUT_THRESHOLD    50
-#define MIN_MOTOR_THRESHOLD     180
-
-static int32_t minOutputThreshold = 0, motorFeedForward = 0;
+#include <stdio.h>
 
 static FunctionalState state = DISABLE;
+static SpeedCtlMode mode = SpeedCtlMode_STRAIGHT;
 
 static int32_t targetVTransInUmPerS, targetVRotInLsbs;
 static int32_t vTransInUmPerS;
-static volatile int32_t coeffAlpha = 990;
+
 static struct Regulator vTransRegulator, vRotRegulator;
+
+static struct {
+    int32_t vTransKp, vTransKi, vTransKd;
+    int32_t vRotKp, vRotKi, vRotKd;
+    int32_t coeffAccel;
+    int32_t coeffSensors;
+    int32_t minOutputThreshold;
+    int32_t motorFeedForward;
+} params = {
+    .vTransKp = 7000, .vTransKi = 15, .vTransKd = 0,
+    .vRotKp = 100000, .vRotKi = 30000, .vRotKd = 0,
+    .coeffAccel = 990,
+    .coeffSensors = 1000,
+    .minOutputThreshold = 0,
+    .motorFeedForward = 0
+};
 
 void SpeedCtl_Reset(void)
 {
@@ -32,35 +44,23 @@ void SpeedCtl_Reset(void)
 void SpeedCtl_SetState(FunctionalState newState)
 {
     state = newState;
-}
-
-void SpeedCtl_SetMode(SpeedCtlMode mode)
-{
-    switch (mode) {
-    case SpeedCtlMode_ENCODER:
-
-        break;
-
-    case SpeedCtlMode_IMU:
-
-        break;
-
-    case SpeedCtlMode_COMBINED:
-
-        break;
-
-    case SpeedCtlMode_TEST_PERPENDICULAR:
-
-        break;
+    if (state == DISABLE) {
+        SpeedCtl_SetTarget(0, 0);
+        Motors_SetPwm(0, 0);
     }
 }
 
-void SpeedCtl_Setup(int32_t vTransKp, int32_t vTransKi, int32_t vRotKp, int32_t vRotKi)
+void SpeedCtl_SetMode(SpeedCtlMode newMode)
+{
+    mode = newMode;
+}
+
+void SpeedCtl_Setup(void)
 {
     // Velocity PI regulator = Position PD regulator. Математика, ёпт.
     SpeedCtl_Reset();
-    Regulator_Setup(&vTransRegulator, vTransKp, vTransKi, 0);
-    Regulator_Setup(&vRotRegulator, vRotKp, vRotKi, 0);
+    Regulator_Setup(&vTransRegulator, params.vTransKp, params.vTransKi, params.vTransKd);
+    Regulator_Setup(&vRotRegulator, params.vRotKp, params.vRotKi, params.vRotKd);
 }
 
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
@@ -80,13 +80,13 @@ static int32_t AdjustRegOutput(int32_t regOutput)
         regOutput = -regOutput;
     }
 
-    if (regOutput < minOutputThreshold)
+    if (regOutput < params.minOutputThreshold)
         regOutput = 0;
     else
-        regOutput += motorFeedForward;
+        regOutput += params.motorFeedForward;
 
-    if (regOutput > 3600)
-        regOutput = 3600;
+    if (regOutput > MOTOR_PWM_MAX)
+        regOutput = MOTOR_PWM_MAX;
 
     return sign * regOutput;
 }
@@ -111,20 +111,24 @@ void SpeedCtl_Update(void)
 
     // mImuUnits/ms ~ m/(s^2) = (m/s)/s = (mm/s)/ms
     vTransInUmPerS =
-            ((int64_t)vTransInUmPerS * coeffAlpha - (int64_t)imuData.gyroX * 9800 * coeffAlpha / 8192
-            + (1000 - coeffAlpha) * (int64_t)transInCounts * 1000000 / COUNTS_PER_MM) / 100;
+            ((int64_t)vTransInUmPerS * params.coeffAccel - (int64_t)imuData.gyroX * 9800 * params.coeffAccel / 8192
+            + (1000 - params.coeffAccel) * (int64_t)transInCounts * 1000000 / COUNTS_PER_MM) / 100;
     vTransInUmPerS += vTransInUmPerS > 0 ? 5 : -5;
     vTransInUmPerS /= 10;
 
     int32_t vRotInLsbs = imuData.gyroZ;
 
     // mImuUnits/ms ~ Deg/S = mDeg/ms
-    //int32_t deltaAngInMimuUnits = vRotInLsbs; // * 1ms;
+    int32_t rotInMimuUnits = vRotInLsbs; // * 1ms;
 
-    //Odometry_Update(transInCounts, deltaAngInMimuUnits);
+    Odometry_UpdateReckon(transInCounts, rotInMimuUnits);
 
     int64_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInUmPerS, vTransInUmPerS);
     int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
+
+    if (mode == SpeedCtlMode_STRAIGHT) {
+        rotOutput += (int64_t)params.coeffSensors * Sensors_GetSteeringError();
+    }
 
     int32_t leftOutput = (transOutput - rotOutput) / 100000;
     leftOutput += leftOutput > 0 ? 5 : -5;
@@ -141,44 +145,6 @@ void SpeedCtl_Update(void)
         Motors_SetPwm(leftOutput, rightOutput);
 }
 
-//~ static void TestOpenLoop(int16_t pwmL, int16_t pwmR)
-//~ {
-    //~ struct IMU_Data imuData;
-    //~ int32_t dl, dr, dp;
-
-    //~ printf("Test %d %d\n", pwmL, pwmR);
-    //~ Motors_SetPwm(pwmL, pwmR);
-    //~ for (int i = 0; i < 300; i++) {
-        //~ IMU_GetData(&imuData);
-        //~ Encoders_GetDelta(&dl, &dr);
-        //~ dp = (dl + dr) / 2;
-        //~ printf("%d,%ld\n", imuData.gyroZ, dp);
-        //~ Millis_Wait(10);
-    //~ }
-    //~ Motors_SetPwm(0, 0);
-//~ }
-
-//~ void Controller_Update(void)
-//~ {
-    //~ uint16_t sensorsValues[5];
-
-    //~ Sensors_ReadToBuffer(sensorsValues);
-
-    //~ if (dance) {
-        //~ int16_t pwmL = ((int32_t)2000 - sensorsValues[ReceiverChannel_LeftFront]) * 120 / 2000;
-        //~ int16_t pwmR = ((int32_t)2000 - sensorsValues[ReceiverChannel_RightFront]) * 120 / 2000;
-
-        //~ pwmL = pwmL > 0 ? pwmL + 240 : pwmL - 240;
-        //~ pwmR = pwmR > 0 ? pwmR + 240 : pwmR - 240;
-
-        //~ Motors_SetpwmLeft(pwmL);
-        //~ Motors_SetpwmRight(pwmR);
-        //~ Motors_SetTargetpwm(pwmL, pwmR);
-    //~ } else {
-        //~ Motors_SetTargetpwm(0, 0);
-    //~ }
-//~ }
-
 static int execute(int argc, char *argv[])
 {
     if (argc < 1)
@@ -187,34 +153,25 @@ static int execute(int argc, char *argv[])
     if (!strcmp(argv[0], "sett")) {
         if (argc != 4)
             return -1;
-        int32_t kP = atol(argv[1]);
-        int32_t kI = atol(argv[2]);
-        int32_t kD = atol(argv[3]);
-        Regulator_Reset(&vTransRegulator);
-        Regulator_Setup(&vTransRegulator, kP, kI, kD);
+        params.vTransKp = atol(argv[1]);
+        params.vTransKi = atol(argv[2]);
+        params.vTransKd = atol(argv[3]);
+        SpeedCtl_Setup();
     }
     else if (!strcmp(argv[0], "setr")) {
         if (argc != 4)
             return -1;
-        int32_t kP = atol(argv[1]);
-        int32_t kI = atol(argv[2]);
-        int32_t kD = atol(argv[3]);
-        Regulator_Reset(&vRotRegulator);
-        Regulator_Setup(&vRotRegulator, kP, kI, kD);
+        params.vRotKp = atol(argv[1]);
+        params.vRotKi = atol(argv[2]);
+        params.vRotKd = atol(argv[3]);
+        SpeedCtl_Setup();
     }
     else if (!strcmp(argv[0], "th")) {
         if (argc != 3)
             return -1;
-        minOutputThreshold = atoi(argv[1]);
-        motorFeedForward = atoi(argv[2]);
+        params.minOutputThreshold = atoi(argv[1]);
+        params.motorFeedForward = atoi(argv[2]);
     }
-    //~ else if (!strcmp(argv[0], "test")) {
-        //~ if (argc != 3)
-            //~ return -1;
-        //~ int16_t pwmL = atoi(argv[1]);
-        //~ int16_t pwmR = atoi(argv[2]);
-        //~ TestOpenLoop(pwmL, pwmR);
-    //~ }
     else if (!strcmp(argv[0], "tgt")) {
         if (argc != 3)
             return -1;
@@ -227,7 +184,7 @@ static int execute(int argc, char *argv[])
             return -1;
 
         unsigned mode = atoi(argv[1]);
-        if (mode > SpeedCtlMode_TEST_PERPENDICULAR)
+        if (mode > SpeedCtlMode_TURN)
             return -2;
 
         SpeedCtl_SetMode((SpeedCtlMode)mode);
@@ -239,10 +196,26 @@ static int execute(int argc, char *argv[])
         FunctionalState newState = (FunctionalState)!!atoi(argv[1]);
         SpeedCtl_SetState(newState);
     }
-    else if (!strcmp(argv[0], "a")) {
+    else if (!strcmp(argv[0], "acc")) {
         if (argc != 2)
             return -1;
-        coeffAlpha = atoi(argv[1]);
+        params.coeffAccel = atoi(argv[1]);
+    }
+    else if (!strcmp(argv[0], "sens")) {
+        if (argc != 2)
+            return -1;
+        params.coeffSensors = atoi(argv[1]);
+    }
+    else if (!strcmp(argv[0], "ps")) {
+        printf("SpeedCtl settings:\n"
+               "vTrans: %ld %ld %ld\n"
+               "vRot: %ld %ld %ld\n"
+               "cA: %ld\tcS: %ld\n"
+               "minThresh: %ld\tmFF: %ld\n",
+               params.vTransKp, params.vTransKi, params.vTransKd,
+               params.vRotKp, params.vRotKi, params.vRotKd,
+               params.coeffAccel, params.coeffSensors,
+               params.minOutputThreshold, params.motorFeedForward);
     }
     else {
         return -2;
@@ -260,13 +233,30 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     );
 }
 
-static struct TelemetryControlBlock telemetryControlBlock = {
+static struct ModuleTelemetry telemetry = {
     .interval = 200,
     .write = WriteTelemetry
+};
+
+static void load(const uint8_t *buffer)
+{
+    memcpy(&params, buffer, sizeof(params));
+}
+
+static void save(uint8_t *buffer)
+{
+    memcpy(buffer, &params, sizeof(params));
+}
+
+static struct ModuleSettings settings = {
+    .dataSize = sizeof(params),
+    .load = load,
+    .save = save
 };
 
 struct Module SpeedCtl_module = {
     .name = "spctl",
     .execute = execute,
-    .telemetry = &telemetryControlBlock
+    .telemetry = &telemetry,
+    .settings = &settings
 };

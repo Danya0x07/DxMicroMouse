@@ -5,9 +5,14 @@
 
 void Queue_Init(struct Queue *queue)
 {
+    Queue_Clear(queue);
+    memset(queue->buffer, 0, queue->len * queue->itemSize);
+}
+
+void Queue_Clear(struct Queue *queue)
+{
     queue->_writePtr = queue->_readPtr = queue->buffer;
     queue->_count = 0;
-    memset(queue->buffer, 0, queue->len * queue->itemSize);
 }
 
 int Queue_Push(struct Queue *queue, const void *item)
@@ -22,6 +27,8 @@ int Queue_Push(struct Queue *queue, const void *item)
     if (queue->_writePtr > (uint8_t *)queue->buffer + queue->len * queue->itemSize)
         queue->_writePtr = queue->buffer;
     queue->_count++;
+
+    return 0;
 }
 
 int Queue_Pop(struct Queue *queue, void *item)
@@ -36,6 +43,8 @@ int Queue_Pop(struct Queue *queue, void *item)
     if (queue->_readPtr > (uint8_t *)queue->buffer + queue->len * queue->itemSize)
         queue->_readPtr = queue->buffer;
     queue->_count--;
+
+    return 0;
 }
 
 bool Queue_IsFull(const struct Queue *queue)

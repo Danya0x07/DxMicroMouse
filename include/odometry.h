@@ -6,9 +6,16 @@
 #define COUNTS_PER_MM    62
 
 void Odometry_Reset(void);
-void Odometry_Update(int32_t transInCounts, int32_t deltaAngInMimuUnits);
-void Odometry_GetPosition(int32_t *mmX, int32_t *mmY, int32_t *degAng);
-void Odometry_GetVelocity(int16_t *vTransInMmPerS, int16_t *vRotInDegPerS);
+
+void Odometry_SetReckon(int32_t distanceInMm, int32_t angleInDeg);
+void Odometry_UpdateReckon(int32_t transInCounts, int32_t rotInMimuUnits);
+void Odometry_GetReckon(int32_t *distanceInMm, int32_t *angleInDeg);
+
+void Odometry_SetPrediction(int32_t distanceInMm, int32_t angleInDeg);
+void Odometry_UpdatePrediction(int32_t transInMm, int32_t rotInDeg);
+void Odometry_GetPrediction(int32_t *distanceInMm, int32_t *angleInDeg);
+
+void Odometry_GetFusion(int32_t *distanceInMm, int32_t *angleInDeg);
 
 extern struct Module Odometry_module;
 

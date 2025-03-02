@@ -49,3 +49,74 @@ int32_t Cos100000(int32_t degAng)
 
     return Sin100000(degAng);
 }
+
+/**
+ * \brief    Fast Square root algorithm, with rounding
+ *
+ * This does arithmetic rounding of the result. That is, if the real answer
+ * would have a fractional part of 0.5 or greater, the result is rounded up to
+ * the next integer.
+ *      - SquareRootRounded(2) --> 1
+ *      - SquareRootRounded(3) --> 2
+ *      - SquareRootRounded(4) --> 2
+ *      - SquareRootRounded(6) --> 2
+ *      - SquareRootRounded(7) --> 3
+ *      - SquareRootRounded(8) --> 3
+ *      - SquareRootRounded(9) --> 3
+ *
+ * https://en.wikipedia.org/wiki/Methods_of_computing_square_roots#Binary_numeral_system_(base_2)
+ * https://stackoverflow.com/a/1101217
+ *
+ * \param[in] input - unsigned integer for which to find the square root
+ *
+ * \return Integer square root of the input value.
+ */
+uint32_t SquareRootRounded(uint32_t input)
+{
+    uint32_t op  = input;
+    uint32_t res = 0;
+    uint32_t one = 1uL << 30; // The second-to-top bit is set: use 1u << 14 for uint16_t type; use 1uL<<30 for uint32_t type
+
+
+    // "one" starts at the highest power of four <= than the argument.
+    while (one > op)
+        one >>= 2;
+
+    while (one != 0) {
+        if (op >= res + one) {
+            op -= (res + one);
+            res += one << 1;
+        }
+        res >>= 1;
+        one >>= 2;
+    }
+
+    /* Do arithmetic rounding to nearest integer */
+    if (op > res)
+        res++;
+
+    return res;
+}
+
+/* Name  : CRC-16 CCITT
+ * Poly  : 0x1021    x^16 + x^12 + x^5 + 1
+ * Init  : 0xFFFF
+ * Revert: false
+ * XorOut: 0x0000
+ * Check : 0x29B1 ("123456789")
+ * MaxLen: 4095 байт (32767 бит) - обнаружение
+ *  одинарных, двойных, тройных и всех нечетных ошибок
+ */
+uint16_t Crc16(const uint8_t *data, unsigned len)
+{
+    uint16_t crc = 0xFFFF;
+
+    while (len--)
+    {
+        crc ^= *data++ << 8;
+
+        for (uint_fast8_t i = 0; i < 8; i++)
+            crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
+    }
+    return crc;
+}

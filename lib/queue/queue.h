@@ -15,6 +15,7 @@ struct Queue {
 };
 
 void Queue_Init(struct Queue *queue);
+void Queue_Clear(struct Queue *queue);
 int Queue_Push(struct Queue *queue, const void *item);
 int Queue_Pop(struct Queue *queue, void *item);
 bool Queue_IsFull(const struct Queue *queue);

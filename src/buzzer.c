@@ -1,4 +1,6 @@
 #include "buzzer.h"
+#include "mcu.h"
+#include <stdlib.h>
 
 void Buzzer_SetFrequency(uint16_t freq)
 {
@@ -65,8 +67,10 @@ void Buzzer_BeepAsync(uint16_t freq, uint16_t duration)
 
 void Buzzer_Update(void)
 {
-    if (Millis_Get() >= endTime)
+    if (endTime && Millis_Get() >= endTime) {
         Buzzer_Stop();
+        endTime = 0;
+    }
 }
 
 static int execute(int argc, char *argv[])
@@ -85,5 +89,4 @@ static int execute(int argc, char *argv[])
 struct Module Buzzer_module = {
     .name = "bz",
     .execute = execute,
-    .telemetry = NULL
 };

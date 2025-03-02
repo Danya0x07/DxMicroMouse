@@ -124,6 +124,55 @@ uint16_t Maze_ReadCellMetadata(struct MazeCell cell)
     return maze.cells[cell.x][cell.y] & METADATA_MASK;
 }
 
+uint_fast8_t Maze_GetDirection(struct MazeCell from, struct MazeCell to)
+{
+    if (to.y > from.y)
+        return MAZE_UP;
+    if (to.y < from.y)
+        return MAZE_DOWN;
+    if (to.x > from.x)
+        return MAZE_RIGHT;
+    return MAZE_LEFT;
+}
+
+uint_fast8_t Maze_GetRelativeDirection(uint_fast8_t facingDirection, uint_fast8_t globalDirection)
+{
+    return (4 + globalDirection - facingDirection) & 3;
+}
+
+uint_fast8_t Maze_GetOppositeDirection(uint_fast8_t direction)
+{
+    return (direction + 2) & 3;
+}
+
+struct MazeCell Maze_GetNeighbor(struct MazeCell cell, uint_fast8_t direction)
+{
+    switch (direction) {
+        case MAZE_UP:
+            if (cell.y < maze.m - 1)
+                cell.y++;
+            break;
+
+        case MAZE_DOWN:
+            if (cell.y > 0)
+                cell.y--;
+            break;
+
+        case MAZE_LEFT:
+            if (cell.x > 0)
+                cell.x--;
+            break;
+
+        case MAZE_RIGHT:
+            if (cell.x < maze.n - 1)
+                cell.x++;
+            break;
+
+        default:    break;
+    }
+    return cell;
+}
+
 void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char meta[6]))
 {
     for (int_fast8_t y = maze.m - 1; y >= 0; y--) {
@@ -175,4 +224,23 @@ void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char me
     }
     MAZE_PUTC('+');
     MAZE_PUTC('\n');
+}
+
+void Maze_SerializeWalls(uint8_t *array)
+{
+    uint16_t *cells = &maze.cells[0][0];
+
+    for (uint_fast16_t i = 0; i < MAZEMAXLEN * MAZEMAXLEN; i += 2) {
+        array[i >> 1] = (cells[i] >> MAZEWALLSHIFT) | (cells[i + 1] >> MAZEWALLSHIFT << 4);
+    }
+}
+
+void Maze_DeserializeWalls(const uint8_t *array)
+{
+    uint16_t *cells = &maze.cells[0][0];
+
+    for (uint_fast16_t i = 0; i < MAZEMAXLEN * MAZEMAXLEN; i += 2) {
+        cells[i] = (uint16_t)array[i >> 1] << MAZEWALLSHIFT;
+        cells[i + 1] = (uint16_t)array[i >> 1] >> 4 << MAZEWALLSHIFT;
+    }
 }

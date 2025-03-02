@@ -1,5 +1,4 @@
 #include "battery.h"
-#include "telemetry.h"
 #include "mcu.h"
 #include <stdlib.h>
 
@@ -53,13 +52,12 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     snprintf(out, TELEMETRY_STRING_SIZE, "BATTERY:%d => %s\n", batteryLevel, STATUS_TXT[Battery_GetStatus()]);
 }
 
-static struct TelemetryControlBlock telemetryControlBlock = {
+static struct ModuleTelemetry telemetry = {
     .interval = 1000,
     .write = WriteTelemetry
 };
 
 struct Module Battery_module = {
     .name = "battery",
-    .execute = NULL,
-    .telemetry = &telemetryControlBlock
+    .telemetry = &telemetry
 };
