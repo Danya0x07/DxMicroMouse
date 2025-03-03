@@ -3,9 +3,7 @@
 #include "mcu.h"
 #include <string.h>
 
-static volatile int32_t currentCountsLeft, currentCountsRight;
-static volatile int32_t prevCountsLeft, prevCountsRight;
-static volatile int32_t deltaCountsLeft, deltaCountsRight;
+struct EncoderCounts current, previous, delta;
 
 int Encoders_Init(void)
 {
@@ -72,33 +70,33 @@ int Encoders_Init(void)
 
 void Encoders_Update(void)
 {
-    int32_t leftPrev = prevCountsLeft;
-    int32_t rightPrev = prevCountsRight;
+    int32_t leftPrev = previous.left;
+    int32_t rightPrev = previous.right;
     int32_t left = AS5048_GetAngleRaw(AS5048_Handle_LEFT) >> 2;
     int32_t right = AS5048_GetAngleRaw(AS5048_Handle_RIGHT) >> 2;
 
-    int32_t delta = left - leftPrev;
-    if (delta >= 0x07FF || delta <= -0x07FF) {
-        if (delta < 0)
-            delta = (int32_t)0x0FFF - leftPrev + left;
+    int32_t diff = left - leftPrev;
+    if (diff >= 0x07FF || diff <= -0x07FF) {
+        if (diff < 0)
+            diff = (int32_t)0x0FFF - leftPrev + left;
         else
-            delta = -((int32_t)0x0FFF - left + leftPrev);
+            diff = -((int32_t)0x0FFF - left + leftPrev);
     }
-    currentCountsLeft += delta;
-    deltaCountsLeft = delta;
+    current.left += diff;
+    delta.left = diff;
 
-    delta = right - rightPrev;
-    if (delta >= 0x07FF || delta <= -0x07FF) {
-        if (delta < 0)
-            delta = (int32_t)0x0FFF - rightPrev + right;
+    diff = right - rightPrev;
+    if (diff >= 0x07FF || diff <= -0x07FF) {
+        if (diff < 0)
+            diff = (int32_t)0x0FFF - rightPrev + right;
         else
-            delta = -((int32_t)0x0FFF - right + rightPrev);
+            diff = -((int32_t)0x0FFF - right + rightPrev);
     }
-    currentCountsRight -= delta; // inverse delta for right encoder due to the way pcb is mounted
-    deltaCountsRight = -delta;
+    current.right -= diff; // inverse diff for right encoder due to the way pcb is mounted
+    delta.right = -diff;
 
-    prevCountsLeft = left;
-    prevCountsRight = right;
+    previous.left = left;
+    previous.right = right;
 }
 
 void Encoders_Reset(void)
@@ -107,33 +105,31 @@ void Encoders_Reset(void)
     AS5048_SetZero(AS5048_Handle_RIGHT, 0);
     AS5048_SetZero(AS5048_Handle_LEFT, AS5048_GetAngleRaw(AS5048_Handle_LEFT));
     AS5048_SetZero(AS5048_Handle_RIGHT, AS5048_GetAngleRaw(AS5048_Handle_RIGHT));
-    currentCountsLeft = currentCountsRight = prevCountsLeft = prevCountsRight = deltaCountsLeft = deltaCountsRight = 0;
+    current.left = current.right = previous.left = previous.right = delta.left = delta.right = 0;
 }
 
-void Encoders_GetCounts(int32_t *left, int32_t *right)
+void Encoders_GetCounts(struct EncoderCounts *c)
 {
     SysTick_DisableInterrupt();
-    *left = currentCountsLeft;
-    *right = currentCountsRight;
+    *c = current;
     SysTick_EnableInterrupt();
 }
 
-void Encoders_GetDelta(int32_t *left, int32_t *right)
+void Encoders_GetDelta(struct EncoderCounts *d)
 {
     SysTick_DisableInterrupt();
-    *left = deltaCountsLeft;
-    *right = deltaCountsRight;
+    *d = delta;
     SysTick_EnableInterrupt();
 }
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    int32_t left, right, deltaLeft, deltaRight;
-    Encoders_GetCounts(&left, &right);
-    Encoders_GetDelta(&deltaLeft, &deltaRight);
+    struct EncoderCounts c, d;
+    Encoders_GetCounts(&c);
+    Encoders_GetDelta(&d);
 
     snprintf(out, TELEMETRY_STRING_SIZE,
-            "L:%-10ld\tR:%-10ld\tdL:%-10ld\tdR:%-10ld\n", left, right, deltaLeft, deltaRight);
+            "L:%-10ld\tR:%-10ld\tdL:%-10ld\tdR:%-10ld\n", c.left, c.right, d.left, d.right);
 }
 
 static int execute(int argc, char *argv[])

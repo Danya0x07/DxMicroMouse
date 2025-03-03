@@ -463,27 +463,27 @@ uint16_t ADC_Read(uint8_t ch)
 	return CalcCalibrated(val);
 }
 
-void *memcpy_v2n(void *_dest, const volatile void *_src, uint16_t n)
-{
-    uint8_t *dest = _dest;
-    const volatile uint8_t *src = _src;
+//~ void *memcpy_v2n(void *_dest, const volatile void *_src, uint16_t n)
+//~ {
+    //~ uint8_t *dest = _dest;
+    //~ const volatile uint8_t *src = _src;
 
-    while (n--) {
-        *dest++ = *src++;
-    }
-    return dest;
-}
+    //~ while (n--) {
+        //~ *dest++ = *src++;
+    //~ }
+    //~ return dest;
+//~ }
 
-volatile void *memcpy_n2v(volatile void *_dest, const void *_src, uint16_t n)
-{
-    volatile uint8_t *dest = _dest;
-    const uint8_t *src = _src;
+//~ volatile void *memcpy_n2v(volatile void *_dest, const void *_src, uint16_t n)
+//~ {
+    //~ volatile uint8_t *dest = _dest;
+    //~ const uint8_t *src = _src;
 
-    while (n--) {
-        *dest++ = *src++;
-    }
-    return dest;
-}
+    //~ while (n--) {
+        //~ *dest++ = *src++;
+    //~ }
+    //~ return dest;
+//~ }
 
 __attribute__((interrupt("WCH-Interrupt-fast")))
 void NMI_Handler(void)

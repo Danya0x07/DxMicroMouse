@@ -135,8 +135,8 @@ void SPI_SetSpeedToNormal(void);
 
 uint16_t ADC_Read(uint8_t ch);
 
-void *memcpy_v2n(void *dest, const volatile void *src, uint16_t n);
-volatile void *memcpy_n2v(volatile void *dest, const void *src, uint16_t n);
+//~ void *memcpy_v2n(void *dest, const volatile void *src, uint16_t n);
+//~ volatile void *memcpy_n2v(volatile void *dest, const void *src, uint16_t n);
 
 #define SysTick_EnableInterrupt()   NVIC_EnableIRQ(SysTicK_IRQn)
 #define SysTick_DisableInterrupt()   NVIC_DisableIRQ(SysTicK_IRQn)

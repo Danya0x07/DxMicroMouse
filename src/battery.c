@@ -4,7 +4,7 @@
 
 #define BATTERY_CHECK_PERIOD    1000
 
-static volatile uint16_t batteryLevel;
+static unsigned batteryLevel;
 
 void Battery_Update(void)
 {
@@ -25,7 +25,7 @@ BatteryStatus Battery_GetStatus(void)
      * 3.5 3450
      * 3.3 3300
      */
-    const uint16_t thresholds[5] = {
+    static const unsigned thresholds[5] = {
         [BatteryStatus_DEAD]    = 3300,
         [BatteryStatus_LOW]     = 3450,
         [BatteryStatus_MEDIUM]  = 3550,
@@ -33,7 +33,7 @@ BatteryStatus Battery_GetStatus(void)
         [BatteryStatus_FULL]    = 3900
     };
 
-    uint16_t level = batteryLevel;
+    unsigned level = batteryLevel;
 
     for (BatteryStatus bs = BatteryStatus_DEAD; bs <= BatteryStatus_FULL; bs++) {
         if (level <= thresholds[bs])

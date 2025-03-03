@@ -93,13 +93,13 @@ static int32_t AdjustRegOutput(int32_t regOutput)
 
 void SpeedCtl_Update(void)
 {
-    int32_t dL, dR;
+    struct EncoderCounts deltaCounts;
     struct IMU_Data imuData;
 
-    Encoders_GetDelta(&dL, &dR);
+    Encoders_GetDelta(&deltaCounts);
     IMU_GetData(&imuData);
 
-    int32_t transInCounts = dL + dR;
+    int32_t transInCounts = deltaCounts.left + deltaCounts.right;
 
     if (transInCounts > 0)
         transInCounts++;

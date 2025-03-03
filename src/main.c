@@ -168,7 +168,7 @@ int main(void)
     }
 }
 
-__attribute__((interrupt("WCH-Interrupt-fast")))
+__attribute__((interrupt()))
 void SysTick_Handler(void)
 {
     MCU_millis++;

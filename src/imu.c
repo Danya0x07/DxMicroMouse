@@ -1,7 +1,8 @@
 #include "imu.h"
 #include "mcu.h"
-#include <mpu6500.h>
 #include "leds.h"
+#include <mpu6500.h>
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -42,7 +43,7 @@ static const uint16_t mpu6500SelfTestTable[256] = {
     30903,31212,31524,31839,32157,32479,32804,33132
 };
 
-static volatile struct IMU_Data currentData;
+static struct IMU_Data currentData;
 static struct MPU6500_SensorData sensorOffset = {0};
 
 struct ImuAverage {
@@ -278,7 +279,7 @@ void IMU_Update(void)
 void IMU_GetData(struct IMU_Data *data)
 {
     SysTick_DisableInterrupt();
-    memcpy_v2n(data, &currentData, sizeof(struct IMU_Data));
+    memcpy(data, &currentData, sizeof(struct IMU_Data));
     SysTick_EnableInterrupt();
 }
 
@@ -288,14 +289,18 @@ static int execute(int argc, char *argv[])
         return -1;
 
     if (!strcmp(argv[0], "cal")) {
+        printf("Calibrating IMU\n");
         IMU_Init(ImuConfiguration_CALIBRATION);
         IMU_Calibrate(5);
         IMU_Init(ImuConfiguration_APP);
+        printf("IMU calibrated\n");
     }
     else if (!strcmp(argv[0], "tst")) {
+        printf("Testing IMU\n");
         IMU_Init(ImuConfiguration_TEST);
         IMU_Test();
         IMU_Init(ImuConfiguration_APP);
+        printf("IMU test complete\n");
     }
     else if (!strcmp(argv[0], "ps")) {
         printf("IMU offsets:\n"

@@ -1,11 +1,11 @@
 #include "uart.h"
 #include "mcu.h"
 
-static volatile char rxBuffer[0x80] = {0};
+static char rxBuffer[0x80] = {0};
 #define INDEX_MASK  (sizeof(rxBuffer) - 1)
 
-static volatile uint32_t count = 0;
-static volatile uint32_t writeIndex = 0;
+static uint32_t count = 0;
+static uint32_t writeIndex = 0;
 static uint32_t readIndex = 0;
 
 #define RECV_IRQ_ON()  NVIC_EnableIRQ(USART1_IRQn)
