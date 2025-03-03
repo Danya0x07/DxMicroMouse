@@ -78,9 +78,9 @@ void Encoders_Update(void)
     int32_t diff = left - leftPrev;
     if (diff >= 0x07FF || diff <= -0x07FF) {
         if (diff < 0)
-            diff = (int32_t)0x0FFF - leftPrev + left;
+            diff = (int32_t)0x0FFF + diff;
         else
-            diff = -((int32_t)0x0FFF - left + leftPrev);
+            diff = -((int32_t)0x0FFF - diff);
     }
     current.left += diff;
     delta.left = diff;
@@ -88,9 +88,9 @@ void Encoders_Update(void)
     diff = right - rightPrev;
     if (diff >= 0x07FF || diff <= -0x07FF) {
         if (diff < 0)
-            diff = (int32_t)0x0FFF - rightPrev + right;
+            diff = (int32_t)0x0FFF + diff;
         else
-            diff = -((int32_t)0x0FFF - right + rightPrev);
+            diff = -((int32_t)0x0FFF - diff);
     }
     current.right -= diff; // inverse diff for right encoder due to the way pcb is mounted
     delta.right = -diff;
@@ -105,7 +105,7 @@ void Encoders_Reset(void)
     AS5048_SetZero(AS5048_Handle_RIGHT, 0);
     AS5048_SetZero(AS5048_Handle_LEFT, AS5048_GetAngleRaw(AS5048_Handle_LEFT));
     AS5048_SetZero(AS5048_Handle_RIGHT, AS5048_GetAngleRaw(AS5048_Handle_RIGHT));
-    current.left = current.right = previous.left = previous.right = delta.left = delta.right = 0;
+    current = previous = delta = (struct EncoderCounts){0};
 }
 
 void Encoders_GetCounts(struct EncoderCounts *c)
