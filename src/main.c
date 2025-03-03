@@ -127,7 +127,7 @@ int main(void)
         while (Button_IsPressed()) {}
 
         for (int i = 0; i < 10; i++) {
-            LED1_ON();
+            LED1_OFF();
             Millis_Wait(100);
             if (Button_GetEvent() == ButtonEvent_PRESS) {
                 Router_EraseMaze();
@@ -137,7 +137,7 @@ int main(void)
                 break;
 
             }
-            LED1_OFF();
+            LED1_ON();
             Millis_Wait(100);
         }
         LED1_OFF();
@@ -187,12 +187,12 @@ void SysTick_Handler(void)
     SpeedCtl_Update();
 }
 
-__attribute__((interrupt()))
-void EXTI1_IRQHandler(void)
-{
-    if(EXTI_GetITStatus(EXTI_Line1) != RESET) {
-        SpeedCtl_SetState(DISABLE);
-        Motors_SetPwm(0, 0);
-        EXTI_ClearITPendingBit(EXTI_Line1);
-    }
-}
+//~ __attribute__((interrupt()))
+//~ void EXTI1_IRQHandler(void)
+//~ {
+    //~ if(EXTI_GetITStatus(EXTI_Line1) != RESET) {
+        //~ SpeedCtl_SetState(DISABLE);
+        //~ Motors_SetPwm(0, 0);
+        //~ EXTI_ClearITPendingBit(EXTI_Line1);
+    //~ }
+//~ }

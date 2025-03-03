@@ -11,9 +11,9 @@ typedef enum {
 
 bool Button_IsPressed(void);
 ButtonEvent_t Button_GetEvent(void);
-ButtonEvent_t Button_GetNextEvent(void);
+//~ ButtonEvent_t Button_GetNextEvent(void);
 
-void Button_EnableInterrupt(void);
-void Button_DisableInterrupt(void);
+//~ void Button_EnableInterrupt(void);
+//~ void Button_DisableInterrupt(void);
 
 #endif // _INC_BUTTON_H

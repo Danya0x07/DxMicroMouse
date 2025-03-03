@@ -111,7 +111,7 @@ void SpeedCtl_Update(void)
 
     // mImuUnits/ms ~ m/(s^2) = (m/s)/s = (mm/s)/ms
     vTransInUmPerS =
-            ((int64_t)vTransInUmPerS * params.coeffAccel - (int64_t)imuData.gyroX * 9800 * params.coeffAccel / 8192
+            ((int64_t)vTransInUmPerS * params.coeffAccel - (int64_t)imuData.accelX * 9800 * params.coeffAccel / 8192
             + (1000 - params.coeffAccel) * (int64_t)transInCounts * 1000000 / COUNTS_PER_MM) / 100;
     vTransInUmPerS += vTransInUmPerS > 0 ? 5 : -5;
     vTransInUmPerS /= 10;

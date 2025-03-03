@@ -290,10 +290,12 @@ static int execute(int argc, char *argv[])
     if (!strcmp(argv[0], "cal")) {
         IMU_Init(ImuConfiguration_CALIBRATION);
         IMU_Calibrate(5);
+        IMU_Init(ImuConfiguration_APP);
     }
     else if (!strcmp(argv[0], "tst")) {
         IMU_Init(ImuConfiguration_TEST);
         IMU_Test();
+        IMU_Init(ImuConfiguration_APP);
     }
     else if (!strcmp(argv[0], "ps")) {
         printf("IMU offsets:\n"

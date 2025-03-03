@@ -35,10 +35,12 @@ void Modules_LoadSettings(void)
     struct ModuleSettings *settings;
     uint8_t *ptr = memoryBuffer;
 
+    SysTick_DisableInterrupt();
     if (Memory_LoadBuffer(memoryBuffer, MEMORY_BUFFER_SIZE) < 0) {
         UART_SendString("Failed to load settings\n");
         return;
     }
+    SysTick_EnableInterrupt();
 
     FOR_EACH_MODULE(m) {
         settings = (*m)->settings;
@@ -48,6 +50,7 @@ void Modules_LoadSettings(void)
             ptr += settings->dataSize;
         }
     }
+    printf("Settings loaded\n");
 }
 
 void Modules_SaveSettings(void)
@@ -59,15 +62,20 @@ void Modules_SaveSettings(void)
         settings = (*m)->settings;
 
         if (settings) {
-            settings->load(ptr);
+            settings->save(ptr);
             ptr += settings->dataSize;
         }
     }
     printf("Saving %d bytes to EEPROM\n", ptr - memoryBuffer);
 
+    SysTick_DisableInterrupt();
     if (Memory_SaveBuffer(memoryBuffer, MEMORY_BUFFER_SIZE) < 0) {
         printf("Failed to save settings\n");
     }
+    else {
+        printf("Settings saved\n");
+    }
+    SysTick_EnableInterrupt();
 }
 
 struct Module *Module_FindByName(const char *name)

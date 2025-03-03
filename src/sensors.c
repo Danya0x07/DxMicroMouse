@@ -14,7 +14,7 @@ static struct {
     int32_t left;
     int32_t front;
     int32_t right;
-} threshold = {1000, 1000, 1000};
+} threshold = {2000, 2000, 2000};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
@@ -54,9 +54,9 @@ static void update(void)
     currentDistance.leftSide -= Receivers_ReadChannel(ReceiverChannel_LS);
     currentDistance.rightSide -= Receivers_ReadChannel(ReceiverChannel_RS);
 
-    currentWalls.left = currentDistance.leftSide <= threshold.left;
-    currentWalls.right = currentDistance.rightSide <= threshold.right;
-    currentWalls.front = (currentDistance.leftFront + currentDistance.rightFront) / 2 <= threshold.front;
+    currentWalls.left = currentDistance.leftSide >= threshold.left;
+    currentWalls.right = currentDistance.rightSide >= threshold.right;
+    currentWalls.front = (currentDistance.leftFront + currentDistance.rightFront) / 2 >= threshold.front;
 }
 
 static void updateWithoutLightening(void)
@@ -131,7 +131,7 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 
 static int execute(int argc, char *argv[])
 {
-    if (argc <= 1)
+    if (argc < 1)
         return -1;
 
     if (!strcmp(argv[0], "lon"))

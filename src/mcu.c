@@ -123,9 +123,9 @@ static inline void initGPIO(void)
 
     // BUTTON
     GPIO_InitStructure.GPIO_Pin = BUTTON_PIN;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(BUTTON_GPIO, &GPIO_InitStructure);
-    GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource1);
+    //~ GPIO_EXTILineConfig(GPIO_PortSourceGPIOD, GPIO_PinSource1);
 
     // BUZZER
     GPIO_PinRemapConfig(GPIO_FullRemap_TIM2, ENABLE);
@@ -186,17 +186,17 @@ static inline void initGPIO(void)
     GPIO_Init(BATTERY_GPIO, &GPIO_InitStructure);
 }
 
-static inline void initEXTI(void)
-{
-    EXTI_InitTypeDef EXTI_InitStructure = {0};
+//~ static inline void initEXTI(void)
+//~ {
+    //~ EXTI_InitTypeDef EXTI_InitStructure = {0};
 
-    // BUTTON
-    EXTI_InitStructure.EXTI_Line = EXTI_Line1;
-    EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
-    EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
-    EXTI_InitStructure.EXTI_LineCmd = ENABLE;
-    EXTI_Init(&EXTI_InitStructure);
-}
+    //~ // BUTTON
+    //~ EXTI_InitStructure.EXTI_Line = EXTI_Line1;
+    //~ EXTI_InitStructure.EXTI_Mode = EXTI_Mode_Interrupt;
+    //~ EXTI_InitStructure.EXTI_Trigger = EXTI_Trigger_Falling;
+    //~ EXTI_InitStructure.EXTI_LineCmd = ENABLE;
+    //~ EXTI_Init(&EXTI_InitStructure);
+//~ }
 
 static inline void initTimers(void)
 {
@@ -376,7 +376,6 @@ void MCU_Init(void)
 {
     initRCC();
     initGPIO();
-    initEXTI();
     initTimers();
     initUART(115200);
     initSPI();

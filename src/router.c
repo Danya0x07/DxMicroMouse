@@ -198,6 +198,13 @@ static void Spin(void)
 
 void Router_Setup(void)
 {
+    unsigned mazeN, mazeM;
+
+    Maze_GetDimensions(&mazeN, &mazeM);
+    if (!mazeN || !mazeM || mazeN > MAZEMAXLEN || mazeM > MAZEMAXLEN) {
+        Maze_Init(params.mazeN, params.mazeM);
+    }
+
     cell = params.startCell;
     direction = params.startDirection;
     Router_UpdateWalls = UpdateWalls;
