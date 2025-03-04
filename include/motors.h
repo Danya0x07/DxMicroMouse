@@ -3,8 +3,8 @@
 
 #include "module.h"
 
-void Motors_SetPwm(int16_t left, int16_t right);
-void Motors_GetPwm(int16_t *left, int16_t *right);
+void Motors_SetPwm(int left, int right);
+void Motors_GetPwm(int *left, int *right);
 
 extern struct Module Motors_module;
 

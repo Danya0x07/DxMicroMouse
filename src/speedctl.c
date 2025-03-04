@@ -57,7 +57,6 @@ void SpeedCtl_SetMode(SpeedCtlMode newMode)
 
 void SpeedCtl_Setup(void)
 {
-    // Velocity PI regulator = Position PD regulator. Математика, ёпт.
     SpeedCtl_Reset();
     Regulator_Setup(&vTransRegulator, params.vTransKp, params.vTransKi, params.vTransKd);
     Regulator_Setup(&vRotRegulator, params.vRotKp, params.vRotKi, params.vRotKd);
@@ -65,8 +64,6 @@ void SpeedCtl_Setup(void)
 
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
 {
-    SpeedCtl_Reset();
-    //~ targetVTransInUmPerMs = ((vTransInMmPerS << 15) / 4000 + 5) / 10;
     targetVTransInUmPerS = vTransInMmPerS * 1000;
     targetVRotInLsbs = (vRotInDegPerS << 15) / 2000;
 }
@@ -177,6 +174,7 @@ static int execute(int argc, char *argv[])
             return -1;
         int32_t vTransInMmPerS = atoi(argv[1]);
         int32_t vRotInDegPerS = atoi(argv[2]);
+        SpeedCtl_Reset();
         SpeedCtl_SetTarget(vTransInMmPerS, vRotInDegPerS);
     }
     else if (!strcmp(argv[0], "mode")) {

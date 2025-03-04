@@ -113,7 +113,7 @@ int main(void)
     MCU_Init();
     Sensors_SetLightening(DISABLE);
     LED0_Blink(2, 150);
-    printf("DxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
+    printf("\nDxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
 
     bool setupMode = Button_IsPressed();
 
