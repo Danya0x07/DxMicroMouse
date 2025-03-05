@@ -11,6 +11,6 @@ enum ReceiverChannel {
     ReceiverChannel_F,
 };
 
-uint16_t Receivers_ReadChannel(enum ReceiverChannel channel);
+uint32_t Receivers_ReadChannel(enum ReceiverChannel channel);
 
 #endif // _INC_RECEIVERS_H

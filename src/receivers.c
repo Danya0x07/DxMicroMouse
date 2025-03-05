@@ -1,8 +1,8 @@
 #include "receivers.h"
 
-uint16_t Receivers_ReadChannel(enum ReceiverChannel channel)
+uint32_t Receivers_ReadChannel(enum ReceiverChannel channel)
 {
-    static const uint8_t CHANNEL_TABLE[5] = {
+    static const unsigned CHANNEL_TABLE[5] = {
         [ReceiverChannel_LF]    = RECEIVER_LF_CH,
         [ReceiverChannel_LS]    = RECEIVER_LS_CH,
         [ReceiverChannel_RS]    = RECEIVER_RS_CH,
@@ -10,5 +10,10 @@ uint16_t Receivers_ReadChannel(enum ReceiverChannel channel)
         [ReceiverChannel_F]     = RECEIVER_F_CH
     };
 
-    return ADC_Read(CHANNEL_TABLE[channel]);
+    uint32_t adcValue = ADC_Read(CHANNEL_TABLE[channel]);
+
+    if (channel == ReceiverChannel_F)
+        adcValue = 4095 - adcValue;
+
+    return adcValue;
 }

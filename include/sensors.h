@@ -9,7 +9,6 @@ struct SensorsDistance {
     int32_t leftSide;
     int32_t rightSide;
     int32_t rightFront;
-    int32_t front;
 };
 
 struct SensorsWalls {

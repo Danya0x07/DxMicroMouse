@@ -13,7 +13,7 @@ static FunctionalState state = DISABLE;
 static SpeedCtlMode mode = SpeedCtlMode_STRAIGHT;
 
 static int32_t targetVTransInUmPerS, targetVRotInLsbs;
-static int32_t vTransInUmPerS;
+static int32_t vTransInUmPerS, vRotInLsbs;
 
 static struct Regulator vTransRegulator, vRotRegulator;
 
@@ -21,17 +21,24 @@ static struct {
     int32_t vTransKp, vTransKi, vTransKd;
     int32_t vRotKp, vRotKi, vRotKd;
     int32_t coeffAccel;
+    int32_t coeffGyro;
     int32_t coeffSensors;
     int32_t minOutputThreshold;
     int32_t motorFeedForward;
 } params = {
-    .vTransKp = 7000, .vTransKi = 15, .vTransKd = 0,
-    .vRotKp = 100000, .vRotKi = 30000, .vRotKd = 0,
-    .coeffAccel = 990,
+    .vTransKp = 10000, .vTransKi = 200, .vTransKd = 0,
+    .vRotKp = 90000, .vRotKi = 30000, .vRotKd = 0,
+    .coeffAccel = 400,
+    .coeffGyro = 1000,
     .coeffSensors = 1000,
-    .minOutputThreshold = 0,
-    .motorFeedForward = 0
+    .minOutputThreshold = 50,
+    .motorFeedForward = 1900
 };
+
+static enum TelemetryMode {
+    TelemetryMode_VTRANS,
+    TelemetryMode_VROT
+} telemetryMode;
 
 void SpeedCtl_Reset(void)
 {
@@ -97,6 +104,7 @@ void SpeedCtl_Update(void)
     IMU_GetData(&imuData);
 
     int32_t transInCounts = deltaCounts.left + deltaCounts.right;
+    int32_t rotInCounts = deltaCounts.right - deltaCounts.left;
 
     if (transInCounts > 0)
         transInCounts++;
@@ -113,12 +121,13 @@ void SpeedCtl_Update(void)
     vTransInUmPerS += vTransInUmPerS > 0 ? 5 : -5;
     vTransInUmPerS /= 10;
 
-    int32_t vRotInLsbs = imuData.gyroZ;
+    vRotInLsbs = (params.coeffGyro * imuData.gyroZ
+            + (1000 - params.coeffGyro) * rotInCounts * 256) / 100;
+    vRotInLsbs += vRotInLsbs > 0 ? 5 : -5;
+    vRotInLsbs /= 10;
 
     // mImuUnits/ms ~ Deg/S = mDeg/ms
-    int32_t rotInMimuUnits = vRotInLsbs; // * 1ms;
-
-    Odometry_UpdateReckon(transInCounts, rotInMimuUnits);
+    Odometry_UpdateReckon(transInCounts, vRotInLsbs);
 
     int64_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInUmPerS, vTransInUmPerS);
     int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
@@ -199,22 +208,31 @@ static int execute(int argc, char *argv[])
             return -1;
         params.coeffAccel = atoi(argv[1]);
     }
+    else if (!strcmp(argv[0], "gyr")) {
+        if (argc != 2)
+            return -1;
+        params.coeffGyro = atoi(argv[1]);
+    }
     else if (!strcmp(argv[0], "sens")) {
         if (argc != 2)
             return -1;
         params.coeffSensors = atoi(argv[1]);
     }
+    else if (!strcmp(argv[0], "tm") && argc == 2)
+        telemetryMode = (enum TelemetryMode)atoi(argv[1]);
     else if (!strcmp(argv[0], "ps")) {
         printf("SpeedCtl settings:\n"
                "vTrans: %ld %ld %ld\n"
                "vRot: %ld %ld %ld\n"
-               "cA: %ld\tcS: %ld\n"
+               "cA: %ld\tcG: %ld\tcS: %ld\n"
                "minThresh: %ld\tmFF: %ld\n",
                params.vTransKp, params.vTransKi, params.vTransKd,
                params.vRotKp, params.vRotKi, params.vRotKd,
-               params.coeffAccel, params.coeffSensors,
+               params.coeffAccel, params.coeffGyro, params.coeffSensors,
                params.minOutputThreshold, params.motorFeedForward);
     }
+    else if (!strcmp(argv[0], "rst"))
+        SpeedCtl_Reset();
     else {
         return -2;
     }
@@ -224,11 +242,20 @@ static int execute(int argc, char *argv[])
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    snprintf(out, TELEMETRY_STRING_SIZE,
-        "tgt: %ld\tv: %ld\n",
-        targetVTransInUmPerS,
-        vTransInUmPerS
-    );
+    if (telemetryMode == TelemetryMode_VTRANS) {
+        snprintf(out, TELEMETRY_STRING_SIZE,
+            "tgtV: %ld\tv: %ld\n",
+            targetVTransInUmPerS,
+            vTransInUmPerS
+        );
+    }
+    else {
+        snprintf(out, TELEMETRY_STRING_SIZE,
+            "tgtW: %ld\tw: %ld\n",
+            targetVRotInLsbs,
+            vRotInLsbs
+        );
+    }
 }
 
 static struct ModuleTelemetry telemetry = {

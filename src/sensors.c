@@ -1,131 +1,178 @@
 #include "sensors.h"
 #include "emitters.h"
 #include "receivers.h"
+#include "utils.h"
 
 #include <string.h>
 #include <stdlib.h>
 
 #define FINGER_THRESHOLD    3000
 
-static struct SensorsDistance currentDistance;
-static struct SensorsWalls currentWalls;
+typedef struct SensorsDistance SensorData;
+
+static struct SensorsDistance distance;
+static struct SensorsWalls walls;
+
+static SensorData calibValue = {
+    .leftFront = 7186,
+    .leftSide = 7448,
+    .rightSide = 7766,
+    .rightFront = 7457
+};
 
 static struct {
     int32_t left;
     int32_t front;
     int32_t right;
-} threshold = {2000, 2000, 2000};
+} threshold = {1143, 1150, 1714};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
     TelemetryMode_WALLS
 } telemetryMode;
 
-static void update(void)
+static void MeasureReflection(SensorData *reflection)
 {
     Emitters_LeftFrontOn();
     Emitters_RightFrontOn();
-    Emitters_FrontOn();
     Micros_Wait(60);
 
-    currentDistance.leftFront = Receivers_ReadChannel(ReceiverChannel_LF);
-    currentDistance.rightFront = Receivers_ReadChannel(ReceiverChannel_RF);
-    currentDistance.front = Receivers_ReadChannel(ReceiverChannel_F);
+    reflection->leftFront = Receivers_ReadChannel(ReceiverChannel_LF);
+    reflection->rightFront = Receivers_ReadChannel(ReceiverChannel_RF);
 
     Emitters_LeftFrontOff();
     Emitters_RightFrontOff();
-    Emitters_FrontOff();
     Micros_Wait(60);
 
-    currentDistance.leftFront -= Receivers_ReadChannel(ReceiverChannel_LF);
-    currentDistance.rightFront -= Receivers_ReadChannel(ReceiverChannel_RF);
-    currentDistance.front -= Receivers_ReadChannel(ReceiverChannel_F);
+    reflection->leftFront -= Receivers_ReadChannel(ReceiverChannel_LF);
+    reflection->rightFront -= Receivers_ReadChannel(ReceiverChannel_RF);
 
     Emitters_LeftSideOn();
     Emitters_RightSideOn();
     Micros_Wait(60);
 
-    currentDistance.leftSide = Receivers_ReadChannel(ReceiverChannel_LS);
-    currentDistance.rightSide = Receivers_ReadChannel(ReceiverChannel_RS);
+    reflection->leftSide = Receivers_ReadChannel(ReceiverChannel_LS);
+    reflection->rightSide = Receivers_ReadChannel(ReceiverChannel_RS);
     Emitters_LeftSideOff();
     Emitters_RightSideOff();
     Micros_Wait(60);
 
-    currentDistance.leftSide -= Receivers_ReadChannel(ReceiverChannel_LS);
-    currentDistance.rightSide -= Receivers_ReadChannel(ReceiverChannel_RS);
+    reflection->leftSide -= Receivers_ReadChannel(ReceiverChannel_LS);
+    reflection->rightSide -= Receivers_ReadChannel(ReceiverChannel_RS);
 
-    currentWalls.left = currentDistance.leftSide >= threshold.left;
-    currentWalls.right = currentDistance.rightSide >= threshold.right;
-    currentWalls.front = (currentDistance.leftFront + currentDistance.rightFront) / 2 >= threshold.front;
+    if (reflection->leftFront < 0)
+        reflection->leftFront = 0;
+    if (reflection->leftSide < 0)
+        reflection->leftSide = 0;
+    if (reflection->rightSide < 0)
+        reflection->rightSide = 0;
+    if (reflection->rightFront < 0)
+        reflection->rightFront = 0;
 }
 
-static void updateWithoutLightening(void)
+static void Update(void)
+{
+    SensorData reflection;
+
+    MeasureReflection(&reflection);
+
+    distance.leftFront = 100 * calibValue.leftFront / ln1000(reflection.leftFront);
+    distance.leftSide = 100 * calibValue.leftSide / ln1000(reflection.leftSide);
+    distance.rightSide = 100 * calibValue.rightSide / ln1000(reflection.rightSide);
+    distance.rightFront = 100 * calibValue.rightFront / ln1000(reflection.rightFront);
+
+    walls.left = distance.leftSide <= threshold.left;
+    walls.right = distance.rightSide <= threshold.right;
+    walls.front = (distance.leftFront + distance.rightFront) / 2 <= threshold.front;
+}
+
+static void UpdateForCalibration(void)
+{
+    SensorData reflection;
+
+    MeasureReflection(&reflection);
+
+    distance.leftFront = ln1000(reflection.leftFront);
+    distance.leftSide = ln1000(reflection.leftSide);
+    distance.rightSide = ln1000(reflection.rightSide);
+    distance.rightFront = ln1000(reflection.rightFront);
+
+    walls.left = 0;
+    walls.right = 0;
+    walls.front = 0;
+}
+
+static void UpdateWithoutLightening(void)
 {
     Micros_Wait(250);
-    currentDistance.leftFront = Receivers_ReadChannel(ReceiverChannel_LF);
-    currentDistance.leftSide = Receivers_ReadChannel(ReceiverChannel_LS);
-    currentDistance.rightSide = Receivers_ReadChannel(ReceiverChannel_RS);
-    currentDistance.rightFront = Receivers_ReadChannel(ReceiverChannel_RF);
-    currentDistance.front = Receivers_ReadChannel(ReceiverChannel_F);
+
+    distance.leftFront = 10000;
+    distance.leftSide = 10000;
+    distance.rightSide = 10000;
+    distance.rightFront = 10000;
+
+    walls.left = 0;
+    walls.right = 0;
+    walls.front = 0;
 }
 
-void (*Sensors_Update)(void) = update;
+void (*Sensors_Update)(void) = Update;
 
 void Sensors_SetLightening(FunctionalState state)
 {
-    Sensors_Update = state ? update : updateWithoutLightening;
+    Sensors_Update = state ? Update : UpdateWithoutLightening;
 }
 
-void Sensors_ReadDistance(struct SensorsDistance *distance)
+void Sensors_ReadDistance(struct SensorsDistance *d)
 {
     SysTick_DisableInterrupt();
-    *distance = currentDistance;
+    *d = distance;
     SysTick_EnableInterrupt();
 }
 
-void Sensors_ReadWalls(struct SensorsWalls *walls)
+void Sensors_ReadWalls(struct SensorsWalls *w)
 {
     SysTick_DisableInterrupt();
-    *walls = currentWalls;
+    *w = walls;
     SysTick_EnableInterrupt();
 }
 
 bool Sensors_DetectFinger(void)
 {
-    struct SensorsDistance distance;
+    struct SensorsDistance d;
 
-    Sensors_ReadDistance(&distance);
-    return distance.rightFront <= FINGER_THRESHOLD;
+    Sensors_ReadDistance(&d);
+    return d.rightFront <= FINGER_THRESHOLD;
 }
 
 int32_t Sensors_GetSteeringError(void)
 {
     int32_t error = 0;
 
-    if (currentWalls.left && currentWalls.right)
-        error = currentDistance.leftSide - currentDistance.rightSide;
-    else if (currentWalls.left)
-        error = 2 * (currentDistance.leftSide - threshold.left);
-    else if (currentWalls.right)
-        error = 2 * (threshold.right - currentDistance.rightSide);
+    if (walls.left && walls.right)
+        error = distance.leftSide - distance.rightSide;
+    else if (walls.left)
+        error = 2 * (distance.leftSide - threshold.left);
+    else if (walls.right)
+        error = 2 * (threshold.right - distance.rightSide);
 
     return error;
 }
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    struct SensorsDistance distance;
-    struct SensorsWalls walls;
+    struct SensorsDistance d;
+    struct SensorsWalls w;
 
     if (telemetryMode == TelemetryMode_DISTANCES) {
-        Sensors_ReadDistance(&distance);
-        snprintf(out, TELEMETRY_STRING_SIZE, "LF:%-5ld\tLS:%-5ld\tF:%-5ld\tRS:%-5ld\tRF:%-5ld\n",
-                distance.leftFront, distance.leftSide, distance.front, distance.rightSide, distance.rightFront);
+        Sensors_ReadDistance(&d);
+        snprintf(out, TELEMETRY_STRING_SIZE, "LF:%-5ld\tLS:%-5ld\tRS:%-5ld\tRF:%-5ld\n",
+                d.leftFront, d.leftSide, d.rightSide, d.rightFront);
     }
     else if (telemetryMode == TelemetryMode_WALLS) {
-        Sensors_ReadWalls(&walls);
+        Sensors_ReadWalls(&w);
         snprintf(out, TELEMETRY_STRING_SIZE, "L:%-5d\tF:%-5d\tR:%-5d\n",
-                walls.left, walls.front, walls.right);
+                w.left, w.front, w.right);
     }
 }
 
@@ -138,6 +185,8 @@ static int execute(int argc, char *argv[])
         Sensors_SetLightening(ENABLE);
     else if (!strcmp(argv[0], "loff"))
         Sensors_SetLightening(DISABLE);
+    else if (!strcmp(argv[0], "lcal"))
+        Sensors_Update = UpdateForCalibration;
     else if (!strcmp(argv[0], "tm") && argc == 2)
         telemetryMode = (enum TelemetryMode)atoi(argv[1]);
     else if (!strcmp(argv[0], "thr") && argc == 4) {
@@ -145,10 +194,18 @@ static int execute(int argc, char *argv[])
         threshold.front = atoi(argv[2]);
         threshold.right = atoi(argv[3]);
     }
+    else if (!strcmp(argv[0], "cal") && argc == 5) {
+        calibValue.leftFront = atoi(argv[1]);
+        calibValue.leftSide = atoi(argv[2]);
+        calibValue.rightSide = atoi(argv[3]);
+        calibValue.rightFront = atoi(argv[4]);
+    }
     else if (!strcmp(argv[0], "ps")) {
         printf("Sensors settings:\n"
-               "thresh: %ld %ld %ld\n",
-               threshold.left, threshold.front, threshold.right);
+               "thresh: %ld %ld %ld\n"
+               "cal: %ld %ld %ld %ld\n",
+               threshold.left, threshold.front, threshold.right,
+               calibValue.leftFront, calibValue.leftSide, calibValue.rightSide, calibValue.rightFront);
     }
     else
         return -2;
@@ -159,15 +216,19 @@ static int execute(int argc, char *argv[])
 static void load(const uint8_t *buffer)
 {
     memcpy(&threshold, buffer, sizeof(threshold));
+    buffer += sizeof(threshold);
+    memcpy(&calibValue, buffer, sizeof(calibValue));
 }
 
 static void save(uint8_t *buffer)
 {
     memcpy(buffer, &threshold, sizeof(threshold));
+    buffer += sizeof(threshold);
+    memcpy(buffer, &calibValue, sizeof(calibValue));
 }
 
 static struct ModuleSettings settings = {
-    .dataSize = sizeof(threshold),
+    .dataSize = sizeof(threshold) + sizeof(calibValue),
     .load = load,
     .save = save
 };

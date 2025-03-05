@@ -3,7 +3,7 @@
 
 #include "module.h"
 
-#define COUNTS_PER_MM    62
+#define COUNTS_PER_MM    63
 
 void Odometry_Reset(void);
 

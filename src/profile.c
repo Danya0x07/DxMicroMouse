@@ -70,7 +70,7 @@ void Profile_SyncByTotalTime(struct Profile *dest, const struct Profile *src)
     dest->t0 = src->t0;
     dest->t3 = src->t3;
     dest->t1 = src->t0 + dest->vCoast * 1000 / acc;
-    dest->t2 = src->t2 - dest->vCoast * 1000 / acc;
+    dest->t2 = src->t3 - dest->vCoast * 1000 / acc;
 
     acc *= sign;
     dest->vCoast *= sign;

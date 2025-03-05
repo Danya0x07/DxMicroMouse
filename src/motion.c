@@ -14,18 +14,18 @@ struct MotionConfig {
 
 static struct MotionConfig configs[] = {
     [MotionMode_SLOW] = {
-        .vTransA = 180,
-        .vTransB = 90,
-        .vRot = 120,
-        .aTrans = 800,
-        .aRot = 800
+        .vTransA = 220,
+        .vTransB = 160,
+        .vRot = 240,
+        .aTrans = 300,
+        .aRot = 300
     },
     [MotionMode_FAST] = {
-        .vTransA = 300,
-        .vTransB = 150,
-        .vRot = 270,
-        .aTrans = 1000,
-        .aRot = 1000
+        .vTransA = 360,
+        .vTransB = 220,
+        .vRot = 300,
+        .aTrans = 400,
+        .aRot = 400
     }
 };
 
@@ -167,6 +167,8 @@ static void Start(const struct MotionCtlBlock *m)
     else {
         Profile_Setup(&vRotProfile, Millis_Get());
     }
+
+    SpeedCtl_Reset();
     ongoing = true;
 }
 

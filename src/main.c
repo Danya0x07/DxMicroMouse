@@ -43,7 +43,10 @@ static void InitModules(void)
         printf("Memory retcode: %d\n", retcode);
         Buzzer_Blink(1, 1000, 300);
     }
-    Modules_LoadSettings();
+    if (!Button_IsPressed())
+        Modules_LoadSettings();
+    else
+        printf("Skip loading settings\n");
 
     if ((retcode = Encoders_Init()) != 0) {
         printf("Encoders retcode: %d\n", retcode);
@@ -63,6 +66,26 @@ static void InitModules(void)
     Router_Setup();
 
     printf("======= INITIALIZATION FINISHED =======\n");
+}
+
+static bool GetPress(void)
+{
+    bool press = false;
+    while (Button_IsPressed()) {}
+
+    for (int i = 0; i < 10; i++) {
+        LED1_OFF();
+        Millis_Wait(100);
+        if (Button_GetEvent() == ButtonEvent_PRESS) {
+            press = true;
+            break;
+        }
+        LED1_ON();
+        Millis_Wait(100);
+    }
+    LED1_OFF();
+    Millis_Wait(200);
+    return press;
 }
 
 static void WaitForFinger(void)
@@ -115,33 +138,21 @@ int main(void)
     LED0_Blink(2, 150);
     printf("\nDxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
 
-    bool setupMode = Button_IsPressed();
-
     InitModules();
+
+    bool setupMode = GetPress();
 
     if (setupMode) {
         Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 50);
         printf("Setup mode\n");
         Motion_SetDiscreteMotion(ENABLE);
 
-        while (Button_IsPressed()) {}
-
-        for (int i = 0; i < 10; i++) {
-            LED1_OFF();
-            Millis_Wait(100);
-            if (Button_GetEvent() == ButtonEvent_PRESS) {
-                Router_EraseMaze();
-                Modules_SaveSettings();
-                printf("Maze erased from RAM\n");
-                Buzzer_Sing((uint16_t []){2000, 1800}, 2, 50);
-                break;
-
-            }
-            LED1_ON();
-            Millis_Wait(100);
+        if (GetPress()) {
+            Router_EraseMaze();
+            Modules_SaveSettings();
+            printf("Maze erased from RAM\n");
+            Buzzer_Sing((uint16_t []){2000, 1800}, 2, 50);
         }
-        LED1_OFF();
-        Millis_Wait(200);
 
         for (;;) {
             Shell_Spin();

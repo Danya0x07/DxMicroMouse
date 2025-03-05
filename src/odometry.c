@@ -94,6 +94,9 @@ static int execute(int argc, char *argv[])
                "cA: %ld\n",
                coeffAlpha);
     }
+    else
+        return -2;
+
     return 0;
 }
 
