@@ -4,6 +4,10 @@
 
 #define BATTERY_CHECK_PERIOD    1000
 
+static const char *STATUS_TXT[] = {
+    "DEAD", "LOW", "MEDIUM", "HIGH", "FULL"
+};
+
 static unsigned batteryLevel;
 
 void Battery_Update(void)
@@ -43,13 +47,14 @@ BatteryStatus Battery_GetStatus(void)
     return BatteryStatus_FULL;
 }
 
+const char *Battery_StatusToStr(BatteryStatus status)
+{
+    return STATUS_TXT[status];
+}
+
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    static const char *STATUS_TXT[] = {
-        "DEAD", "LOW", "MEDIUM", "HIGH", "FULL"
-    };
-
-    snprintf(out, TELEMETRY_STRING_SIZE, "BATTERY:%d => %s\n", batteryLevel, STATUS_TXT[Battery_GetStatus()]);
+    snprintf(out, TELEMETRY_STRING_SIZE, "BATTERY:%d => %s\n", batteryLevel, Battery_StatusToStr(Battery_GetStatus()));
 }
 
 static struct ModuleTelemetry telemetry = {

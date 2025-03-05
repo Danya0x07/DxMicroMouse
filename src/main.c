@@ -68,6 +68,17 @@ static void InitModules(void)
     printf("======= INITIALIZATION FINISHED =======\n");
 }
 
+static void CheckBattery(void)
+{
+    BatteryStatus batteryStatus = Battery_GetStatus();
+
+    printf("Battery status: %s\n", Battery_StatusToStr(batteryStatus));
+    if (batteryStatus <= BatteryStatus_LOW) {
+        printf("WARNING: low power!\n");
+        Buzzer_Blink(3, 600, 80);
+    }
+}
+
 static bool GetPress(void)
 {
     bool press = false;
@@ -139,6 +150,7 @@ int main(void)
     printf("\nDxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
 
     InitModules();
+    CheckBattery();
 
     bool setupMode = GetPress();
 
@@ -176,6 +188,7 @@ int main(void)
             Modules_SaveSettings();  // to save known maze
             Router_RunToStart();
             Modules_SaveSettings();  // to save known maze
+            CheckBattery();
         }
     }
 }

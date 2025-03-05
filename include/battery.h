@@ -13,6 +13,7 @@ typedef enum {
 
 void Battery_Update(void);
 BatteryStatus Battery_GetStatus(void);
+const char *Battery_StatusToStr(BatteryStatus status);
 
 extern struct Module Battery_module;
 
