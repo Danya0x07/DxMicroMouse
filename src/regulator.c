@@ -15,8 +15,8 @@ void Regulator_Reset(struct Regulator *reg)
 
 int64_t Regulator_Output(struct Regulator *reg, int32_t target, int32_t feedback)
 {
-    int64_t error = target - feedback;
-    int64_t diffError = error - reg->prevError;
+    int32_t error = target - feedback;
+    int32_t diffError = error - reg->prevError;
 
     reg->prevError = error;
     reg->intError += error;

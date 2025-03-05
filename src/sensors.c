@@ -14,17 +14,17 @@ static struct SensorsDistance distance;
 static struct SensorsWalls walls;
 
 static SensorData calibValue = {
-    .leftFront = 7186,
-    .leftSide = 7448,
-    .rightSide = 7766,
-    .rightFront = 7457
+    .leftFront = 6545,
+    .leftSide = 6818,
+    .rightSide = 7051,
+    .rightFront = 6816
 };
 
 static struct {
     int32_t left;
     int32_t front;
     int32_t right;
-} threshold = {1143, 1150, 1714};
+} threshold = {200, 200, 200}, middle = {181, 181, 181};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
@@ -76,10 +76,10 @@ static void Update(void)
 
     MeasureReflection(&reflection);
 
-    distance.leftFront = 100 * calibValue.leftFront / ln1000(reflection.leftFront);
-    distance.leftSide = 100 * calibValue.leftSide / ln1000(reflection.leftSide);
-    distance.rightSide = 100 * calibValue.rightSide / ln1000(reflection.rightSide);
-    distance.rightFront = 100 * calibValue.rightFront / ln1000(reflection.rightFront);
+    distance.leftFront = 200 * calibValue.leftFront / ln1000(reflection.leftFront);
+    distance.leftSide = 200 * calibValue.leftSide / ln1000(reflection.leftSide);
+    distance.rightSide = 200 * calibValue.rightSide / ln1000(reflection.rightSide);
+    distance.rightFront = 200 * calibValue.rightFront / ln1000(reflection.rightFront);
 
     walls.left = distance.leftSide <= threshold.left;
     walls.right = distance.rightSide <= threshold.right;
@@ -151,10 +151,10 @@ int32_t Sensors_GetSteeringError(void)
 
     if (walls.left && walls.right)
         error = distance.rightSide - distance.leftSide;
-    else if (walls.left)
-        error = 2 * (threshold.left - distance.leftSide);
-    else if (walls.right)
-        error = 2 * (distance.rightSide - threshold.right);
+    else if (distance.leftSide <= middle.left)
+        error = 2 * (middle.left - distance.leftSide);
+    else if (distance.rightSide <= middle.right)
+        error = 2 * (distance.rightSide - middle.right);
 
     return error;
 }
@@ -194,6 +194,11 @@ static int execute(int argc, char *argv[])
         threshold.front = atoi(argv[2]);
         threshold.right = atoi(argv[3]);
     }
+    else if (!strcmp(argv[0], "mid") && argc == 4) {
+        middle.left = atoi(argv[1]);
+        middle.front = atoi(argv[2]);
+        threshold.right = atoi(argv[3]);
+    }
     else if (!strcmp(argv[0], "cal") && argc == 5) {
         calibValue.leftFront = atoi(argv[1]);
         calibValue.leftSide = atoi(argv[2]);
@@ -203,9 +208,11 @@ static int execute(int argc, char *argv[])
     else if (!strcmp(argv[0], "ps")) {
         printf("Sensors settings:\n"
                "thresh: %ld %ld %ld\n"
-               "cal: %ld %ld %ld %ld\n",
+               "cal: %ld %ld %ld %ld\n"
+               "mid: %ld %ld %ld\n",
                threshold.left, threshold.front, threshold.right,
-               calibValue.leftFront, calibValue.leftSide, calibValue.rightSide, calibValue.rightFront);
+               calibValue.leftFront, calibValue.leftSide, calibValue.rightSide, calibValue.rightFront,
+               middle.left, middle.front, middle.right);
     }
     else
         return -2;
@@ -218,6 +225,8 @@ static void load(const uint8_t *buffer)
     memcpy(&threshold, buffer, sizeof(threshold));
     buffer += sizeof(threshold);
     memcpy(&calibValue, buffer, sizeof(calibValue));
+    buffer += sizeof(calibValue);
+    memcpy(&middle, buffer, sizeof(middle));
 }
 
 static void save(uint8_t *buffer)
@@ -225,10 +234,12 @@ static void save(uint8_t *buffer)
     memcpy(buffer, &threshold, sizeof(threshold));
     buffer += sizeof(threshold);
     memcpy(buffer, &calibValue, sizeof(calibValue));
+    buffer += sizeof(calibValue);
+    memcpy(buffer, &middle, sizeof(middle));
 }
 
 static struct ModuleSettings settings = {
-    .dataSize = sizeof(threshold) + sizeof(calibValue),
+    .dataSize = sizeof(threshold) + sizeof(calibValue) + sizeof(middle),
     .load = load,
     .save = save
 };

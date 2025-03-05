@@ -150,6 +150,8 @@ int main(void)
     printf("\nDxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
 
     InitModules();
+
+    Millis_Wait(1000);
     CheckBattery();
 
     bool setupMode = GetPress();
