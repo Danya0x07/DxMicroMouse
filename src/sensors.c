@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define FINGER_THRESHOLD    3000
+#define FINGER_THRESHOLD    95
 
 typedef struct SensorsDistance SensorData;
 
@@ -150,11 +150,11 @@ int32_t Sensors_GetSteeringError(void)
     int32_t error = 0;
 
     if (walls.left && walls.right)
-        error = distance.leftSide - distance.rightSide;
+        error = distance.rightSide - distance.leftSide;
     else if (walls.left)
-        error = 2 * (distance.leftSide - threshold.left);
+        error = 2 * (threshold.left - distance.leftSide);
     else if (walls.right)
-        error = 2 * (threshold.right - distance.rightSide);
+        error = 2 * (distance.rightSide - threshold.right);
 
     return error;
 }

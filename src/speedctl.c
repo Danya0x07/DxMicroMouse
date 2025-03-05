@@ -15,7 +15,7 @@ static SpeedCtlMode mode = SpeedCtlMode_STRAIGHT;
 static int32_t targetVTransInUmPerS, targetVRotInLsbs;
 static int32_t vTransInUmPerS, vRotInLsbs;
 
-static struct Regulator vTransRegulator, vRotRegulator;
+static struct Regulator vTransRegulator, vRotRegulator, offsetRegulator;
 
 static struct {
     int32_t vTransKp, vTransKi, vTransKd;
@@ -30,7 +30,7 @@ static struct {
     .vRotKp = 90000, .vRotKi = 30000, .vRotKd = 0,
     .coeffAccel = 400,
     .coeffGyro = 1000,
-    .coeffSensors = 1000,
+    .coeffSensors = 300000,
     .minOutputThreshold = 50,
     .motorFeedForward = 1900
 };
@@ -45,6 +45,7 @@ void SpeedCtl_Reset(void)
     vTransInUmPerS = 0;
     Regulator_Reset(&vTransRegulator);
     Regulator_Reset(&vRotRegulator);
+    Regulator_Reset(&offsetRegulator);
     Encoders_Reset();
 }
 
@@ -67,6 +68,7 @@ void SpeedCtl_Setup(void)
     SpeedCtl_Reset();
     Regulator_Setup(&vTransRegulator, params.vTransKp, params.vTransKi, params.vTransKd);
     Regulator_Setup(&vRotRegulator, params.vRotKp, params.vRotKi, params.vRotKd);
+    Regulator_Setup(&offsetRegulator, 0, params.coeffSensors, 0);
 }
 
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
@@ -133,7 +135,12 @@ void SpeedCtl_Update(void)
     int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
 
     if (mode == SpeedCtlMode_STRAIGHT) {
-        rotOutput += (int64_t)params.coeffSensors * Sensors_GetSteeringError();
+        int64_t offsetOutput = Regulator_Output(&offsetRegulator, 0,
+                Sensors_GetSteeringError() * (targetVTransInUmPerS != 0));
+
+        if (targetVTransInUmPerS < 0)
+            offsetOutput = -offsetOutput;
+        rotOutput += offsetOutput;
     }
 
     int32_t leftOutput = (transOutput - rotOutput) / 100000;
@@ -217,6 +224,7 @@ static int execute(int argc, char *argv[])
         if (argc != 2)
             return -1;
         params.coeffSensors = atoi(argv[1]);
+        SpeedCtl_Setup();
     }
     else if (!strcmp(argv[0], "tm") && argc == 2)
         telemetryMode = (enum TelemetryMode)atoi(argv[1]);
