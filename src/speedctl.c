@@ -122,22 +122,23 @@ void SpeedCtl_Update(void)
     vTransInUmPerS += vTransInUmPerS > 0 ? 5 : -5;
     vTransInUmPerS /= 10;
 
-    vRotInLsbs = (params.coeffGyro * imuData.gyroZ
-            + (1000 - params.coeffGyro) * rotInCounts * 256) / 100;
+    // Override coeffGyro for backward trim movement
+    int32_t coeffGyro = mode == SpeedCtlMode_BACKTRIM ? 100 : params.coeffGyro;
+
+    vRotInLsbs = (coeffGyro * imuData.gyroZ
+            + (1000 - coeffGyro) * rotInCounts * 256) / 100;
     vRotInLsbs += vRotInLsbs > 0 ? 5 : -5;
     vRotInLsbs /= 10;
 
     // mImuUnits/ms ~ Deg/S = mDeg/ms
     Odometry_UpdateReckon(transInCounts, vRotInLsbs);
 
-    int32_t offsetFeedback = 0;
-
     if (mode == SpeedCtlMode_STRAIGHT && targetVTransInUmPerS > 0) {
-        offsetFeedback = params.coeffSensors * Sensors_GetSteeringError();
+        vRotInLsbs += params.coeffSensors * Sensors_GetSteeringError();
     }
 
     int64_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInUmPerS, vTransInUmPerS);
-    int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs + offsetFeedback);
+    int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
 
     int32_t leftOutput = (transOutput - rotOutput) / 100000;
     leftOutput += leftOutput > 0 ? 5 : -5;

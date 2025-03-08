@@ -54,7 +54,7 @@ static const struct MotionCtlBlock {
         .vTransChange = VTransChange_B20
     },
     [Motion_PARK_FWD2DP] = {
-        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 30),
+        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + CELLHALF),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2A
     },
@@ -64,27 +64,27 @@ static const struct MotionCtlBlock {
         .vTransChange = VTransChange_A2A
     },
     [Motion_FWD_DP2C] = {
-        .distanceInMm = +(CELLHALF + 20),
+        .distanceInMm = +(CELLHALF),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A20
     },
     [Motion_FWD_DP2T] = {
-        .distanceInMm = 20,
+        .distanceInMm = 30,
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2B
     },
     [Motion_FWD_T2DP] = {
-        .distanceInMm = 20,
+        .distanceInMm = 30,
         .angleInDeg = 0,
         .vTransChange = VTransChange_B2A
     },
     [Motion_SMOOTH_LEFT90] = {
-        .distanceInMm = 110,
+        .distanceInMm = 94,
         .angleInDeg = 90,
         .vTransChange = VTransChange_B2B
     },
     [Motion_SMOOTH_RIGHT90] = {
-        .distanceInMm = 110,
+        .distanceInMm = 94,
         .angleInDeg = -90,
         .vTransChange = VTransChange_B2A
     },

@@ -27,7 +27,11 @@ static void _CheckCompletionStatus(ManeuverStatus status)
 
 static void _Backtrim_OnNextMotion(uint32_t idx)
 {
-    if (idx == 1) {
+    if (idx == 0) {
+        SpeedCtl_Reset();
+        SpeedCtl_SetMode(SpeedCtlMode_BACKTRIM);
+    }
+    else if (idx == 1) {
         Router_UpdateWalls();
         SpeedCtl_Reset();
         SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
@@ -51,6 +55,7 @@ static void _SmoothTurn_OnNextMotion(uint32_t idx)
     }
     else if (idx == 2) {
         SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+        ApplyCorrection();
     }
 }
 
@@ -67,6 +72,9 @@ static void _TurnBack_OnNextMotion(uint32_t idx)
     else if (idx == 1) {
         SpeedCtl_SetMode(SpeedCtlMode_TURN);
         Buzzer_BeepAsync(1500, 30);
+    }
+    else if (idx == 2) {
+        SpeedCtl_SetMode(SpeedCtlMode_BACKTRIM);
     }
     else if (idx == 3) {
         SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);

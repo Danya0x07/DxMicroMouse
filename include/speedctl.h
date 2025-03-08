@@ -6,7 +6,8 @@
 
 typedef enum {
     SpeedCtlMode_STRAIGHT,
-    SpeedCtlMode_TURN
+    SpeedCtlMode_TURN,
+    SpeedCtlMode_BACKTRIM
 } SpeedCtlMode;
 
 void SpeedCtl_Reset(void);
