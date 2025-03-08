@@ -29,6 +29,7 @@ static void _Backtrim_OnNextMotion(uint32_t idx)
 {
     if (idx == 1) {
         Router_UpdateWalls();
+        SpeedCtl_Reset();
         SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
     }
 }

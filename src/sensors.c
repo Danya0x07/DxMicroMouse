@@ -6,7 +6,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define FINGER_THRESHOLD    95
+#define FINGER_THRESHOLD    950
 
 typedef struct SensorsDistance SensorData;
 
@@ -24,7 +24,7 @@ static struct {
     int32_t left;
     int32_t front;
     int32_t right;
-} threshold = {200, 200, 200}, middle = {181, 181, 181};
+} threshold = {1013, 960, 1020}, middle = {910, 960, 900};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
@@ -76,10 +76,10 @@ static void Update(void)
 
     MeasureReflection(&reflection);
 
-    distance.leftFront = 200 * calibValue.leftFront / ln1000(reflection.leftFront);
-    distance.leftSide = 200 * calibValue.leftSide / ln1000(reflection.leftSide);
-    distance.rightSide = 200 * calibValue.rightSide / ln1000(reflection.rightSide);
-    distance.rightFront = 200 * calibValue.rightFront / ln1000(reflection.rightFront);
+    distance.leftFront = 1000 * calibValue.leftFront / ln1000(reflection.leftFront);
+    distance.leftSide = 1000 * calibValue.leftSide / ln1000(reflection.leftSide);
+    distance.rightSide = 1000 * calibValue.rightSide / ln1000(reflection.rightSide);
+    distance.rightFront = 1000 * calibValue.rightFront / ln1000(reflection.rightFront);
 
     walls.left = distance.leftSide <= threshold.left;
     walls.right = distance.rightSide <= threshold.right;
@@ -197,7 +197,7 @@ static int execute(int argc, char *argv[])
     else if (!strcmp(argv[0], "mid") && argc == 4) {
         middle.left = atoi(argv[1]);
         middle.front = atoi(argv[2]);
-        threshold.right = atoi(argv[3]);
+        middle.right = atoi(argv[3]);
     }
     else if (!strcmp(argv[0], "cal") && argc == 5) {
         calibValue.leftFront = atoi(argv[1]);

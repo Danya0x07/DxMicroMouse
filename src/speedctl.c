@@ -30,7 +30,7 @@ static struct {
     .vRotKp = 90000, .vRotKi = 30000, .vRotKd = 0,
     .coeffAccel = 400,
     .coeffGyro = 1000,
-    .coeffSensors = 20,
+    .coeffSensors = 4,
     .minOutputThreshold = 50,
     .motorFeedForward = 1900
 };
