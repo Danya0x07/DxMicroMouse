@@ -42,13 +42,21 @@ static void _CorrectDistance(uint32_t idx)
 
 static void _SmoothTurn_OnNextMotion(uint32_t idx)
 {
-    SpeedCtl_SetMode(SpeedCtlMode_TURN);
+    if (idx == 0) {
+        Buzzer_BeepAsync(4000, 20);
+        ApplyCorrection();
+    }
+    else if (idx == 1) {
+        SpeedCtl_SetMode(SpeedCtlMode_TURN);
+    }
+    else if (idx == 2) {
+        SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+    }
 }
 
 static void _SmoothTurn_OnComplete(ManeuverStatus status)
 {
     _CheckCompletionStatus(status);
-    SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
 }
 
 static void _TurnBack_OnNextMotion(uint32_t idx)
@@ -101,15 +109,15 @@ static const struct ManeuverCtlBlock {
         .onComplete = _CheckCompletionStatus
     },
     [Maneuver_SMOOTHLEFT] = {
-        .motions = (const enum Motion []){Motion_SMOOTH_LEFT90},
-        .numMotions = 1,
+        .motions = (const enum Motion []){Motion_FWD_DP2T, Motion_SMOOTH_LEFT90, Motion_FWD_T2DP},
+        .numMotions = 3,
         .onNextMotion = _SmoothTurn_OnNextMotion,
         .loop = _DoNothing, // TODO: Implement crash detection
         .onComplete = _SmoothTurn_OnComplete
     },
     [Maneuver_SMOOTHRIGHT] = {
-        .motions = (const enum Motion []){Motion_SMOOTH_RIGHT90},
-        .numMotions = 1,
+        .motions = (const enum Motion []){Motion_FWD_DP2T, Motion_SMOOTH_RIGHT90, Motion_FWD_T2DP},
+        .numMotions = 3,
         .onNextMotion = _SmoothTurn_OnNextMotion,
         .loop = _DoNothing,
         .onComplete = _SmoothTurn_OnComplete

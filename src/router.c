@@ -40,6 +40,21 @@ static struct {
     .extendGoal = false
 };
 
+static int PrintMazeMeta(struct MazeCell c, uint_fast8_t row, char meta[6])
+{
+    if (row == 0) {
+        static const char dirchars[4] = {'^', '<', 'v', '>'};
+        const char d = dirchars[direction];
+
+        return snprintf(meta, 6, "(%d%d)%c", c.x, c.y,
+                c.x == cell.x && c.y == cell.y ? d : ' ');
+    }
+    else if (row == 1) {
+        return snprintf(meta, 6, "%d", Floodfill_GetDistance(c));
+    }
+    return 0;
+}
+
 static void UpdateWalls(void)
 {
     struct SensorsWalls walls;
@@ -126,7 +141,7 @@ static void OnDecisionPoint(void)
         Odometry_GetFusion(&distance, &angle);
 
         int32_t distanceError = predictedDistance - distance;
-        if (distanceError >= CORR_NEED_THRESH)
+        if (distanceError >= CORR_NEED_THRESH || distanceError <= -CORR_NEED_THRESH)
             Maneuver_SetDistanceError(distanceError);
     }
 
@@ -217,6 +232,7 @@ static void RunToTarget(void)
 
     do {
         Spin();
+        Maze_Print(PrintMazeMeta);
         if (state == RouterState_FAILED) {
             Fan_Off();
             for (;;) {}
@@ -240,6 +256,7 @@ void Router_RunToFinish(RouterRunType runType)
     RunToTarget();
     Fan_Off();
     Router_UpdateWalls = UpdateWalls;
+    Maze_Print(PrintMazeMeta);
 }
 
 void Router_RunToStart(void)
@@ -251,6 +268,7 @@ void Router_RunToStart(void)
     Maneuver_PrepareToRun(RouterRunType_SEARCH);
     Floodfill_Setup(params.startCell, false);
     RunToTarget();
+    Maze_Print(PrintMazeMeta);
 }
 
 void (*Router_UpdateWalls)(void) = UpdateWalls;
@@ -258,21 +276,6 @@ void (*Router_UpdateWalls)(void) = UpdateWalls;
 void Router_EraseMaze(void)
 {
     Maze_Init(params.mazeN, params.mazeM);
-}
-
-static int PrintMazeMeta(struct MazeCell c, uint_fast8_t row, char meta[6])
-{
-    if (row == 0) {
-        static const char dirchars[4] = {'^', '<', 'v', '>'};
-        const char d = dirchars[direction];
-
-        return snprintf(meta, 6, "(%d%d)%c", c.x, c.y,
-                c.x == cell.x && c.y == cell.y ? d : ' ');
-    }
-    else if (row == 1) {
-        return snprintf(meta, 6, "%d", Floodfill_GetDistance(c));
-    }
-    return 0;
 }
 
 static int execute(int argc, char *argv[])

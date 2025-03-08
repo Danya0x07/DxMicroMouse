@@ -18,7 +18,7 @@ static struct MotionConfig configs[] = {
         .vTransB = 160,
         .vRot = 240,
         .aTrans = 300,
-        .aRot = 300
+        .aRot = 500
     },
     [MotionMode_FAST] = {
         .vTransA = 360,
@@ -49,12 +49,12 @@ static const struct MotionCtlBlock {
     } vTransChange;
 } motions[] = {
     [Motion_PARK_BACK2WALL] = {
-        .distanceInMm = -(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 10),
+        .distanceInMm = -(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 7),
         .angleInDeg = 0,
         .vTransChange = VTransChange_B20
     },
     [Motion_PARK_FWD2DP] = {
-        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2),
+        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 30),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2A
     },
@@ -64,17 +64,27 @@ static const struct MotionCtlBlock {
         .vTransChange = VTransChange_A2A
     },
     [Motion_FWD_DP2C] = {
-        .distanceInMm = +(CELLHALF),
+        .distanceInMm = +(CELLHALF + 20),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A20
     },
-    [Motion_SMOOTH_LEFT90] = {
-        .distanceInMm = 145,
-        .angleInDeg = 90,
+    [Motion_FWD_DP2T] = {
+        .distanceInMm = 20,
+        .angleInDeg = 0,
+        .vTransChange = VTransChange_A2B
+    },
+    [Motion_FWD_T2DP] = {
+        .distanceInMm = 20,
+        .angleInDeg = 0,
         .vTransChange = VTransChange_B2A
     },
+    [Motion_SMOOTH_LEFT90] = {
+        .distanceInMm = 110,
+        .angleInDeg = 90,
+        .vTransChange = VTransChange_B2B
+    },
     [Motion_SMOOTH_RIGHT90] = {
-        .distanceInMm = 145,
+        .distanceInMm = 110,
         .angleInDeg = -90,
         .vTransChange = VTransChange_B2A
     },
@@ -168,7 +178,6 @@ static void Start(const struct MotionCtlBlock *m)
         Profile_Setup(&vRotProfile, Millis_Get());
     }
 
-    SpeedCtl_Reset();
     ongoing = true;
 }
 
@@ -184,6 +193,7 @@ void Motion_SetDiscreteMotion(FunctionalState newState)
 
 void Motion_Start(enum Motion motion)
 {
+    printf("Motion: %d, derr: %ld\n", motion, correction.distanceInMm);
     Start(&motions[motion]);
 }
 

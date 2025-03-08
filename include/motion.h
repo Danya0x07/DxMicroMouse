@@ -18,6 +18,8 @@ enum Motion {
 
     Motion_FWD_DP2DP,
     Motion_FWD_DP2C,
+    Motion_FWD_DP2T,
+    Motion_FWD_T2DP,
 
     Motion_SMOOTH_LEFT90,
     Motion_SMOOTH_RIGHT90,

@@ -2,7 +2,7 @@
 #include "mcu.h"
 #include <stdlib.h>
 
-void Buzzer_SetFrequency(uint16_t freq)
+void Buzzer_SetFrequency(unsigned freq)
 {
     /* frequency = APB1_FREQ / ((prescaler + 1) * ARR * 2)
      */
@@ -34,7 +34,7 @@ void Buzzer_Stop(void)
     TIM_Cmd(TIM2, DISABLE);
 }
 
-void Buzzer_Blink(uint16_t times, uint16_t freq, uint16_t duration)
+void Buzzer_Blink(unsigned times, unsigned freq, unsigned duration)
 {
     Buzzer_Stop();
     Buzzer_SetFrequency(freq);
@@ -46,7 +46,7 @@ void Buzzer_Blink(uint16_t times, uint16_t freq, uint16_t duration)
     }
 }
 
-void Buzzer_Sing(uint16_t *freqs, uint16_t len, uint16_t duration)
+void Buzzer_Sing(uint16_t *freqs, unsigned len, unsigned duration)
 {
     Buzzer_Stop();
     while (len--) {
@@ -59,10 +59,11 @@ void Buzzer_Sing(uint16_t *freqs, uint16_t len, uint16_t duration)
 
 static uint32_t endTime;
 
-void Buzzer_BeepAsync(uint16_t freq, uint16_t duration)
+void Buzzer_BeepAsync(unsigned freq, unsigned duration)
 {
-    Buzzer_SetFrequency(freq);
     endTime = Millis_Get() + duration;
+    Buzzer_SetFrequency(freq);
+    Buzzer_Start();
 }
 
 void Buzzer_Update(void)

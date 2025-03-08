@@ -178,7 +178,7 @@ int main(void)
         }
     }
     else {
-        Buzzer_Sing((uint16_t []){2800, 2800, 3300, 3700}, 4, 50);
+        Buzzer_Sing((uint16_t []){2800, 2800, 3300, 4000}, 4, 50);
         printf("Run mode\n");
         SpeedCtl_Reset();
         SpeedCtl_SetState(ENABLE);

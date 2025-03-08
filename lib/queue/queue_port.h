@@ -4,11 +4,17 @@
 #include <stdio.h>
 
 #include "buzzer.h"
+#include "shell.h"
+#include "speedctl.h"
 
 static inline void QueueErrorHook(void)
 {
+    SpeedCtl_Reset();
+    SpeedCtl_SetState(DISABLE);
     Buzzer_Blink(6, 800, 200);
-    for (;;) {}
+    for (;;) {
+        Shell_Spin();
+    }
 }
 
 static inline void QueueFullErrorHook(struct Queue *queue)
