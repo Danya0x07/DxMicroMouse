@@ -46,6 +46,9 @@ struct MazeCell {
 /// Initialize an empty nxm maze surrounded by walls
 void Maze_Init(uint_fast8_t n, uint_fast8_t m);
 
+/// Set dimensions of previously deserialized maze
+void Maze_SetDimensions(uint_fast8_t n, uint_fast8_t m);
+
 /// Get dimensions of previously initialized maze or 0s if none
 void Maze_GetDimensions(uint_fast8_t *n, uint_fast8_t *m);
 

@@ -12,11 +12,7 @@ static struct Maze {
 
 void Maze_Init(uint_fast8_t n, uint_fast8_t m)
 {
-    if (n > MAZEMAXLEN || m > MAZEMAXLEN)
-        return;
-
-    maze.n = n;
-    maze.m = m;
+    Maze_SetDimensions(n, m);
     memset(&maze.cells, 0, sizeof(maze.cells));
 
     // Fill surrounding walls
@@ -28,6 +24,15 @@ void Maze_Init(uint_fast8_t n, uint_fast8_t m)
         Maze_AddWall((struct MazeCell){0, i}, MAZEWALL_WEST);
         Maze_AddWall((struct MazeCell){maze.n - 1, i}, MAZEWALL_EAST);
     }
+}
+
+void Maze_SetDimensions(uint_fast8_t n, uint_fast8_t m)
+{
+    if (n > MAZEMAXLEN || m > MAZEMAXLEN)
+        return;
+
+    maze.n = n;
+    maze.m = m;
 }
 
 void Maze_GetDimensions(uint_fast8_t *n, uint_fast8_t *m)
@@ -228,19 +233,25 @@ void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char me
 
 void Maze_SerializeWalls(uint8_t *array)
 {
-    uint16_t *cells = &maze.cells[0][0];
+    uint_fast16_t idx;
 
-    for (uint_fast16_t i = 0; i < MAZEMAXLEN * MAZEMAXLEN; i += 2) {
-        array[i >> 1] = (cells[i] >> MAZEWALLSHIFT) | (cells[i + 1] >> MAZEWALLSHIFT << 4);
+    for (uint_fast16_t x = 0; x < MAZEMAXLEN; x++) {
+        for (uint_fast16_t y = 0; y < MAZEMAXLEN; y += 2) {
+            idx = (x * MAZEMAXLEN + y) >> 1;
+            array[idx] = (maze.cells[x][y] >> MAZEWALLSHIFT) | (maze.cells[x][y + 1] >> MAZEWALLSHIFT << 4);
+        }
     }
 }
 
 void Maze_DeserializeWalls(const uint8_t *array)
 {
-    uint16_t *cells = &maze.cells[0][0];
+    uint_fast16_t idx;
 
-    for (uint_fast16_t i = 0; i < MAZEMAXLEN * MAZEMAXLEN; i += 2) {
-        cells[i] = (uint16_t)array[i >> 1] << MAZEWALLSHIFT;
-        cells[i + 1] = (uint16_t)array[i >> 1] >> 4 << MAZEWALLSHIFT;
+    for (uint_fast16_t x = 0; x < MAZEMAXLEN; x++) {
+        for (uint_fast16_t y = 0; y < MAZEMAXLEN; y += 2) {
+            idx = (x * MAZEMAXLEN + y) >> 1;
+            maze.cells[x][y] = (uint16_t)array[idx] << MAZEWALLSHIFT;
+            maze.cells[x][y + 1] = (uint16_t)array[idx] >> 4 << MAZEWALLSHIFT;
+        }
     }
 }
