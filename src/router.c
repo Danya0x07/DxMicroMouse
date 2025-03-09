@@ -232,7 +232,7 @@ static void RunToTarget(void)
 
     do {
         Spin();
-        Maze_Print(PrintMazeMeta);
+        //Maze_Print(PrintMazeMeta);
         if (state == RouterState_FAILED) {
             Fan_Off();
             for (;;) {}

@@ -14,11 +14,11 @@ struct MotionConfig {
 
 static struct MotionConfig configs[] = {
     [MotionMode_SLOW] = {
-        .vTransA = 220,
-        .vTransB = 160,
-        .vRot = 240,
-        .aTrans = 300,
-        .aRot = 500
+        .vTransA = 400,
+        .vTransB = 360,
+        .vRot = 1000,
+        .aTrans = 2500,
+        .aRot = 3600
     },
     [MotionMode_FAST] = {
         .vTransA = 360,
@@ -64,27 +64,27 @@ static const struct MotionCtlBlock {
         .vTransChange = VTransChange_A2A
     },
     [Motion_FWD_DP2C] = {
-        .distanceInMm = +(CELLHALF),
+        .distanceInMm = +(CELLHALF + 20),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A20
     },
     [Motion_FWD_DP2T] = {
-        .distanceInMm = 30,
+        .distanceInMm = 25,
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2B
     },
     [Motion_FWD_T2DP] = {
-        .distanceInMm = 30,
+        .distanceInMm = 25,
         .angleInDeg = 0,
         .vTransChange = VTransChange_B2A
     },
     [Motion_SMOOTH_LEFT90] = {
-        .distanceInMm = 94,
+        .distanceInMm = 117,
         .angleInDeg = 90,
         .vTransChange = VTransChange_B2B
     },
     [Motion_SMOOTH_RIGHT90] = {
-        .distanceInMm = 94,
+        .distanceInMm = 117,
         .angleInDeg = -90,
         .vTransChange = VTransChange_B2A
     },
@@ -193,7 +193,7 @@ void Motion_SetDiscreteMotion(FunctionalState newState)
 
 void Motion_Start(enum Motion motion)
 {
-    printf("Motion: %d, derr: %ld\n", motion, correction.distanceInMm);
+    //printf("Motion: %d, derr: %ld\n", motion, correction.distanceInMm);
     Start(&motions[motion]);
 }
 

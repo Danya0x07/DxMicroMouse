@@ -173,6 +173,7 @@ int main(void)
             if (Button_GetEvent() == ButtonEvent_PRESS) {
                 SpeedCtl_SetState(DISABLE);
                 Sensors_SetLightening(DISABLE);
+                Fan_Off();
                 Buzzer_Blink(2, 900, 80);
             }
         }
