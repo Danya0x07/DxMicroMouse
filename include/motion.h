@@ -15,14 +15,23 @@ struct MotionCorrection {
 enum Motion {
     Motion_PARK_BACK2WALL,
     Motion_PARK_FWD2DP,
+    Motion_PARK_FWD2DP_ACC2SLOW,
 
     Motion_FWD_DP2DP,
-    Motion_FWD_DP2C,
+    Motion_FWD_DP2DP_DECC,
+    Motion_FWD_DP2DP_SLOW,
+    Motion_FWD_DP2DP_ACC,
+
     Motion_FWD_DP2T,
     Motion_FWD_T2DP,
 
+    Motion_FWD_DP2C,
+    Motion_FWD_DP2C_FROMSLOW,
+
     Motion_SMOOTH_LEFT90,
     Motion_SMOOTH_RIGHT90,
+    Motion_SMOOTH_LEFT90_LONG,
+    Motion_SMOOTH_RIGHT90_LONG,
 
     Motion_PIVOT_LEFT90,
     Motion_PIVOT_RIGHT90,

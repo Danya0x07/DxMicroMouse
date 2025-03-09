@@ -106,6 +106,7 @@ static void WaitForFinger(void)
     printf("Waiting for your finger... ;)\n");
     Buzzer_Blink(1, 1200, 50);
 
+    runType = RouterRunType_SEARCH;
     LED0_ON();
     while (!Sensors_DetectFinger()) {
         if (Button_GetEvent() == ButtonEvent_PRESS) {

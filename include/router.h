@@ -12,8 +12,8 @@ void Router_Setup(void);
 void Router_RunToFinish(RouterRunType runType);
 void Router_RunToStart(void);
 void Router_EraseMaze(void);
+void Router_UpdateWalls(void);
 
-extern void (*Router_UpdateWalls)(void);
 extern struct Module Router_module;
 
 #endif // _INC_ROUTER_H

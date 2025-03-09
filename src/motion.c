@@ -21,11 +21,11 @@ static struct MotionConfig configs[] = {
         .aRot = 3600
     },
     [MotionMode_FAST] = {
-        .vTransA = 360,
-        .vTransB = 220,
-        .vRot = 300,
-        .aTrans = 400,
-        .aRot = 400
+        .vTransA = 1200,
+        .vTransB = 600,
+        .vRot = 1200,
+        .aTrans = 10000,
+        .aRot = 12000
     }
 };
 
@@ -58,15 +58,30 @@ static const struct MotionCtlBlock {
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2A
     },
+    [Motion_PARK_FWD2DP_ACC2SLOW] = {
+        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + CELLHALF),
+        .angleInDeg = 0,
+        .vTransChange = VTransChange_B2B
+    },
     [Motion_FWD_DP2DP] = {
         .distanceInMm = +(CELLWIDTH),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2A
     },
-    [Motion_FWD_DP2C] = {
-        .distanceInMm = +(CELLHALF + 20),
+    [Motion_FWD_DP2DP_DECC] = {
+        .distanceInMm = +(CELLWIDTH),
         .angleInDeg = 0,
-        .vTransChange = VTransChange_A20
+        .vTransChange = VTransChange_A2B
+    },
+    [Motion_FWD_DP2DP_SLOW] = {
+        .distanceInMm = +(CELLWIDTH),
+        .angleInDeg = 0,
+        .vTransChange = VTransChange_B2B
+    },
+    [Motion_FWD_DP2DP_ACC] = {
+        .distanceInMm = +(CELLWIDTH),
+        .angleInDeg = 0,
+        .vTransChange = VTransChange_B2A
     },
     [Motion_FWD_DP2T] = {
         .distanceInMm = 25,
@@ -78,6 +93,16 @@ static const struct MotionCtlBlock {
         .angleInDeg = 0,
         .vTransChange = VTransChange_B2A
     },
+    [Motion_FWD_DP2C] = {
+        .distanceInMm = +(CELLHALF + 20),
+        .angleInDeg = 0,
+        .vTransChange = VTransChange_A20
+    },
+    [Motion_FWD_DP2C_FROMSLOW] = {
+        .distanceInMm = +(CELLHALF),
+        .angleInDeg = 0,
+        .vTransChange = VTransChange_B20
+    },
     [Motion_SMOOTH_LEFT90] = {
         .distanceInMm = 117,
         .angleInDeg = 90,
@@ -86,7 +111,17 @@ static const struct MotionCtlBlock {
     [Motion_SMOOTH_RIGHT90] = {
         .distanceInMm = 117,
         .angleInDeg = -90,
-        .vTransChange = VTransChange_B2A
+        .vTransChange = VTransChange_B2B
+    },
+    [Motion_SMOOTH_LEFT90_LONG] = {
+        .distanceInMm = 142,
+        .angleInDeg = 90,
+        .vTransChange = VTransChange_B2B
+    },
+    [Motion_SMOOTH_RIGHT90_LONG] = {
+        .distanceInMm = 142,
+        .angleInDeg = -90,
+        .vTransChange = VTransChange_B2B
     },
     [Motion_PIVOT_LEFT90] = {
         .distanceInMm = 0,

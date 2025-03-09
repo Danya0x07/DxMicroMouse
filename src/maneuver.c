@@ -55,13 +55,23 @@ static void _SmoothTurn_OnNextMotion(uint32_t idx)
     }
     else if (idx == 2) {
         SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
-        ApplyCorrection();
     }
 }
 
 static void _SmoothTurn_OnComplete(ManeuverStatus status)
 {
     _CheckCompletionStatus(status);
+}
+
+static void _SmoothTurnLong_OnNextMotion(uint32_t idx)
+{
+    SpeedCtl_SetMode(SpeedCtlMode_TURN);
+}
+
+static void _SmoothTurnLong_OnComplete(ManeuverStatus status)
+{
+    _CheckCompletionStatus(status);
+    SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
 }
 
 static void _TurnBack_OnNextMotion(uint32_t idx)
@@ -88,8 +98,15 @@ static void _Stop_OnNextMotion(uint32_t idx)
         ApplyCorrection();
     }
     else if (idx == 1) {
+        SpeedCtl_Reset();
         SpeedCtl_SetMode(SpeedCtlMode_TURN);
     }
+}
+
+static void _Stop_OnComplete(ManeuverStatus status)
+{
+    SpeedCtl_Reset();
+    _CheckCompletionStatus(status);
 }
 
 static const struct ManeuverCtlBlock {
@@ -109,8 +126,36 @@ static const struct ManeuverCtlBlock {
         .loop = _DoNothing,
         .onComplete = _CheckCompletionStatus
     },
+    [Maneuver_BACKTRIM_RUSH] = {
+        .motions = (const enum Motion []){Motion_PARK_BACK2WALL, Motion_PARK_FWD2DP_ACC2SLOW},
+        .numMotions = 2,
+        .onNextMotion = _Backtrim_OnNextMotion,
+        .loop = _DoNothing,
+        .onComplete = _CheckCompletionStatus
+    },
     [Maneuver_FORWARD] = {
         .motions = (const enum Motion []){Motion_FWD_DP2DP},
+        .numMotions = 1,
+        .onNextMotion = _CorrectDistance,
+        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .onComplete = _CheckCompletionStatus
+    },
+    [Maneuver_FORWARD_SLOWDOWN] = {
+        .motions = (const enum Motion []){Motion_FWD_DP2DP_DECC},
+        .numMotions = 1,
+        .onNextMotion = _CorrectDistance,
+        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .onComplete = _CheckCompletionStatus
+    },
+    [Maneuver_FORWARD_SLOW] = {
+        .motions = (const enum Motion []){Motion_FWD_DP2DP_SLOW},
+        .numMotions = 1,
+        .onNextMotion = _CorrectDistance,
+        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .onComplete = _CheckCompletionStatus
+    },
+    [Maneuver_FORWARD_SPEEDUP] = {
+        .motions = (const enum Motion []){Motion_FWD_DP2DP_ACC},
         .numMotions = 1,
         .onNextMotion = _CorrectDistance,
         .loop = _DoNothing, // TODO: Implement odometry snapping
@@ -130,6 +175,20 @@ static const struct ManeuverCtlBlock {
         .loop = _DoNothing,
         .onComplete = _SmoothTurn_OnComplete
     },
+    [Maneuver_SMOOTHLEFT_LONG] = {
+        .motions = (const enum Motion []){Motion_SMOOTH_LEFT90_LONG},
+        .numMotions = 1,
+        .onNextMotion = _SmoothTurnLong_OnNextMotion,
+        .loop = _DoNothing, // TODO: Implement crash detection
+        .onComplete = _SmoothTurnLong_OnComplete
+    },
+    [Maneuver_SMOOTHRIGHT_LONG] = {
+        .motions = (const enum Motion []){Motion_SMOOTH_RIGHT90_LONG},
+        .numMotions = 1,
+        .onNextMotion = _SmoothTurnLong_OnNextMotion,
+        .loop = _DoNothing,
+        .onComplete = _SmoothTurnLong_OnComplete
+    },
     [Maneuver_TURN_BACK] = {
         .motions = (const enum Motion []) {
                 Motion_FWD_DP2C, Motion_PIVOT_LEFT180, Motion_PARK_BACK2WALL, Motion_PARK_FWD2DP},
@@ -143,7 +202,14 @@ static const struct ManeuverCtlBlock {
         .numMotions = 2,
         .onNextMotion = _Stop_OnNextMotion,
         .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
+        .onComplete = _Stop_OnComplete
+    },
+    [Maneuver_STOP_RUSH] = {
+        .motions = (const enum Motion []){Motion_FWD_DP2C_FROMSLOW, Motion_PIVOT_RIGHT180},
+        .numMotions = 2,
+        .onNextMotion = _Stop_OnNextMotion,
+        .loop = _DoNothing,
+        .onComplete = _Stop_OnComplete
     }
 };
 
