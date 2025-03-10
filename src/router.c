@@ -183,14 +183,12 @@ static void OnDecisionPoint(void)
  * и надо проехать ещё одну ячейку. */
 static void OnTargetReached(void)
 {
-    struct SensorsWalls walls;
     ManeuverStatus maneuverStatus;
     enum Maneuver stopManeuver = runType == RouterRunType_RUSH ? Maneuver_STOP_RUSH : Maneuver_STOP;
 
     Router_UpdateWalls();
 
-    Sensors_ReadWalls(&walls);
-    if (!walls.front) {
+    if (!Maze_CellHasWallOnSide(cell, direction, MAZE_UP)) {
         enum Maneuver forwardManeuver = runType == RouterRunType_RUSH ? Maneuver_FORWARD_SLOW : Maneuver_FORWARD;
 
         if ((maneuverStatus = Maneuver_Perform(forwardManeuver)) != ManeuverStatus_COMPLETED) {
@@ -273,6 +271,7 @@ void Router_RunToFinish(RouterRunType nextRunType)
 
     if (runType == RouterRunType_RUSH) {
         Fan_On();
+        Millis_Wait(1000);
     }
     RunToTarget();
     Fan_Off();

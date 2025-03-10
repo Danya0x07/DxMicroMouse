@@ -111,6 +111,12 @@ bool Maze_CellHasAllWalls(struct MazeCell cell, uint_fast16_t walls)
     return (maze.cells[cell.x][cell.y] & walls) == walls;
 }
 
+bool Maze_CellHasWallOnSide(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side)
+{
+    uint_fast16_t wall = 1 << (uint_fast16_t)(((dir + side) & 3) + MAZEWALLSHIFT);
+    return Maze_CellHasAnyWall(cell, wall);
+}
+
 void Maze_WriteCellMetadata(struct MazeCell cell, uint16_t metadata)
 {
     if (cell.x >= maze.n || cell.y >= maze.m)

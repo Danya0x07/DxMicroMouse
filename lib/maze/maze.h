@@ -24,7 +24,7 @@
  *        0x->     SOUTH
  */
 
-#define MAZEWALLSHIFT   (MAZEMAXLEN - 4)
+#define MAZEWALLSHIFT   12
 
 /// Side definitions for global maze orientation frame
 #define MAZEWALL_NORTH  (1 << (MAZEWALLSHIFT + 0))
@@ -77,6 +77,9 @@ bool Maze_CellHasAnyWall(struct MazeCell cell, uint_fast16_t walls);
 
 /// Check if cell (x,y) has all of walls from mask
 bool Maze_CellHasAllWalls(struct MazeCell cell, uint_fast16_t walls);
+
+/// Check if cell (x,y) has wall in given side with respect to robot current direction.
+bool Maze_CellHasWallOnSide(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side);
 
 /// Write metadata (MAZEWALLSHIFT bits) to cell (x,y)
 void Maze_WriteCellMetadata(struct MazeCell cell, uint16_t metadata);

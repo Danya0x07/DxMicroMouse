@@ -12,6 +12,12 @@ static void ApplyCorrection(void)
     distanceError = 0;
 }
 
+static void ResetCorrection(void)
+{
+    Motion_SetCorrection((struct MotionCorrection){0});
+    distanceError = 0;
+}
+
 static void _DoNothing(uint32_t idx)
 {
     (void)idx;  // (-_-)
@@ -33,7 +39,7 @@ static void _Backtrim_OnNextMotion(uint32_t idx)
     }
     else if (idx == 1) {
         Router_UpdateWalls();
-        SpeedCtl_Reset();
+        //SpeedCtl_Reset();
         SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
     }
 }
@@ -65,6 +71,7 @@ static void _SmoothTurn_OnComplete(ManeuverStatus status)
 
 static void _SmoothTurnLong_OnNextMotion(uint32_t idx)
 {
+    ResetCorrection();
     SpeedCtl_SetMode(SpeedCtlMode_TURN);
 }
 
@@ -98,7 +105,7 @@ static void _Stop_OnNextMotion(uint32_t idx)
         ApplyCorrection();
     }
     else if (idx == 1) {
-        SpeedCtl_Reset();
+        //SpeedCtl_Reset();
         SpeedCtl_SetMode(SpeedCtlMode_TURN);
     }
 }

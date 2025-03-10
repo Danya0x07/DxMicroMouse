@@ -18,14 +18,14 @@ static struct MotionConfig configs[] = {
         .vTransB = 360,
         .vRot = 1000,
         .aTrans = 2500,
-        .aRot = 3600
+        .aRot = 5000
     },
     [MotionMode_FAST] = {
-        .vTransA = 1200,
-        .vTransB = 600,
-        .vRot = 1200,
-        .aTrans = 10000,
-        .aRot = 12000
+        .vTransA = 1100,
+        .vTransB = 640,
+        .vRot = 1000,
+        .aTrans = 3000,
+        .aRot = 9000
     }
 };
 
@@ -84,17 +84,17 @@ static const struct MotionCtlBlock {
         .vTransChange = VTransChange_B2A
     },
     [Motion_FWD_DP2T] = {
-        .distanceInMm = 25,
+        .distanceInMm = 20,
         .angleInDeg = 0,
         .vTransChange = VTransChange_A2B
     },
     [Motion_FWD_T2DP] = {
-        .distanceInMm = 25,
+        .distanceInMm = 20,
         .angleInDeg = 0,
         .vTransChange = VTransChange_B2A
     },
     [Motion_FWD_DP2C] = {
-        .distanceInMm = +(CELLHALF + 20),
+        .distanceInMm = +(CELLHALF),
         .angleInDeg = 0,
         .vTransChange = VTransChange_A20
     },
@@ -104,12 +104,12 @@ static const struct MotionCtlBlock {
         .vTransChange = VTransChange_B20
     },
     [Motion_SMOOTH_LEFT90] = {
-        .distanceInMm = 117,
+        .distanceInMm = 110,
         .angleInDeg = 90,
         .vTransChange = VTransChange_B2B
     },
     [Motion_SMOOTH_RIGHT90] = {
-        .distanceInMm = 117,
+        .distanceInMm = 110,
         .angleInDeg = -90,
         .vTransChange = VTransChange_B2B
     },
@@ -145,6 +145,8 @@ static const struct MotionCtlBlock {
     },
 };
 
+#define MAXIMUM_ALLOWED_CORRECTION  20
+
 static struct MotionCorrection correction = {0};
 static struct Profile vTransProfile, vRotProfile;
 static bool ongoing = false;
@@ -159,6 +161,15 @@ static void Configure(const struct MotionConfig *newConfig)
 
 static void Start(const struct MotionCtlBlock *m)
 {
+    if (m->distanceInMm > 0) {
+        if (correction.distanceInMm < -MAXIMUM_ALLOWED_CORRECTION)
+            correction.distanceInMm = -MAXIMUM_ALLOWED_CORRECTION;
+    }
+    else {
+        if (correction.distanceInMm > MAXIMUM_ALLOWED_CORRECTION)
+            correction.distanceInMm = MAXIMUM_ALLOWED_CORRECTION;
+    }
+
     vTransProfile.square = m->distanceInMm + correction.distanceInMm;
     correction.distanceInMm = 0;
     vTransProfile.a1 = vTransProfile.a2 = config->aTrans;

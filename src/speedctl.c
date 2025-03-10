@@ -29,8 +29,8 @@ static struct {
     .vTransKp = 7000, .vTransKi = 100, .vTransKd = 0,
     .vRotKp = 90000, .vRotKi = 30000, .vRotKd = 0,
     .coeffAccel = 200,
-    .coeffGyro = 800,
-    .coeffSensors = 6,
+    .coeffGyro = 900,
+    .coeffSensors = 10,
     .minOutputThreshold = 50,
     .motorFeedForward = 1900
 };
