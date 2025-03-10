@@ -338,7 +338,7 @@ static int execute(int argc, char *argv[])
         unsigned y = atoi(argv[2]);
         unsigned d = atoi(argv[3]) & 3;
 
-        if (x < params.mazeN && y < params.mazeN) {
+        if (x < params.mazeN && y < params.mazeM) {
             params.startCell.x = x;
             params.startCell.y = y;
             params.startDirection = d;
@@ -351,7 +351,7 @@ static int execute(int argc, char *argv[])
         unsigned y = atoi(argv[2]);
         unsigned e = atoi(argv[3]) & 1;
 
-        if (x < params.mazeN && y < params.mazeN) {
+        if (x < params.mazeN && y < params.mazeM) {
             params.goalCell.x = x;
             params.goalCell.y = y;
             params.extendGoal = e;
