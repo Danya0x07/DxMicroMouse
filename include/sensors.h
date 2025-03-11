@@ -22,6 +22,7 @@ void Sensors_SetLightening(FunctionalState state);
 void Sensors_ReadDistance(struct SensorsDistance *distance);
 void Sensors_ReadWalls(struct SensorsWalls *walls);
 bool Sensors_DetectFinger(void);
+bool Sensors_DetectTransition(void);
 
 int32_t Sensors_GetSteeringError(void);
 

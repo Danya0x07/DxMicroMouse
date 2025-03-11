@@ -135,6 +135,9 @@ void SpeedCtl_Update(void)
 
     if (mode == SpeedCtlMode_STRAIGHT && targetVTransInUmPerS > 0) {
         vRotInLsbs += params.coeffSensors * Sensors_GetSteeringError();
+        if (Sensors_DetectTransition()) {
+            Odometry_SnapReckon();
+        }
     }
 
     int64_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInUmPerS, vTransInUmPerS);

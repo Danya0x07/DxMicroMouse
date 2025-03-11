@@ -7,11 +7,13 @@
 #include <stdlib.h>
 
 #define FINGER_THRESHOLD    950
+#define MAX_ALLOWED_ERROR   30
 
 typedef struct SensorsDistance SensorData;
 
 static struct SensorsDistance distance;
 static struct SensorsWalls walls;
+static bool transitionDetected;
 
 static SensorData calibValue = {
     .leftFront = 6545,
@@ -81,9 +83,15 @@ static void Update(void)
     distance.rightSide = 1000 * calibValue.rightSide / ln1000(reflection.rightSide);
     distance.rightFront = 1000 * calibValue.rightFront / ln1000(reflection.rightFront);
 
-    walls.left = distance.leftSide <= threshold.left;
-    walls.right = distance.rightSide <= threshold.right;
+    bool leftWall = distance.leftSide <= threshold.left;
+    bool rightWall = distance.rightSide <= threshold.right;
+
+    transitionDetected = walls.left && !leftWall && (middle.left - distance.leftSide <= MAX_ALLOWED_ERROR);
+    transitionDetected |= walls.right && !rightWall && (middle.right - distance.rightSide <= MAX_ALLOWED_ERROR);
+
     walls.front = (distance.leftFront + distance.rightFront) / 2 <= threshold.front;
+    walls.left = leftWall;
+    walls.right = rightWall;
 }
 
 static void UpdateForCalibration(void)
@@ -100,6 +108,7 @@ static void UpdateForCalibration(void)
     walls.left = 0;
     walls.right = 0;
     walls.front = 0;
+    transitionDetected = false;
 }
 
 static void UpdateWithoutLightening(void)
@@ -143,6 +152,11 @@ bool Sensors_DetectFinger(void)
 
     Sensors_ReadDistance(&d);
     return d.rightFront <= FINGER_THRESHOLD;
+}
+
+bool Sensors_DetectTransition(void)
+{
+    return transitionDetected;
 }
 
 int32_t Sensors_GetSteeringError(void)

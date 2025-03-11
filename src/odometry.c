@@ -4,6 +4,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define COUNTS_PER_CELL 11116
+#define COUNTS_TO_TRANSITION    6198
+
 static struct Odometry {
     int32_t distance;
     int32_t angle;
@@ -37,6 +40,12 @@ void Odometry_GetReckon(int32_t *distanceInMm, int32_t *angleInDeg)
 {
     *distanceInMm = distanceInCounts / COUNTS_PER_MM;
     *angleInDeg = NormalizeAngleDegrees(angleInmLsb * 2 / 32768);
+}
+
+void Odometry_SnapReckon(void)
+{
+    int32_t traversedCells = distanceInCounts / COUNTS_PER_CELL;
+    distanceInCounts = COUNTS_PER_CELL * traversedCells + COUNTS_TO_TRANSITION;
 }
 
 void Odometry_SetPrediction(int32_t distanceInMm, int32_t angleInDeg)

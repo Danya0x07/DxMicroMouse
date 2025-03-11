@@ -144,28 +144,28 @@ static const struct ManeuverCtlBlock {
         .motions = (const enum Motion []){Motion_FWD_DP2DP},
         .numMotions = 1,
         .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .loop = _DoNothing,
         .onComplete = _CheckCompletionStatus
     },
     [Maneuver_FORWARD_SLOWDOWN] = {
         .motions = (const enum Motion []){Motion_FWD_DP2DP_DECC},
         .numMotions = 1,
         .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .loop = _DoNothing,
         .onComplete = _CheckCompletionStatus
     },
     [Maneuver_FORWARD_SLOW] = {
         .motions = (const enum Motion []){Motion_FWD_DP2DP_SLOW},
         .numMotions = 1,
         .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .loop = _DoNothing,
         .onComplete = _CheckCompletionStatus
     },
     [Maneuver_FORWARD_SPEEDUP] = {
         .motions = (const enum Motion []){Motion_FWD_DP2DP_ACC},
         .numMotions = 1,
         .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing, // TODO: Implement odometry snapping
+        .loop = _DoNothing,
         .onComplete = _CheckCompletionStatus
     },
     [Maneuver_SMOOTHLEFT] = {
