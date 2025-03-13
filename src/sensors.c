@@ -161,16 +161,17 @@ bool Sensors_DetectTransition(void)
 
 int32_t Sensors_GetSteeringError(void)
 {
-    int32_t error = 0;
+    int32_t leftError = middle.left - distance.leftSide;
+    int32_t rightError = distance.rightSide - middle.right;
 
     if (walls.left && walls.right)
-        error = distance.rightSide - distance.leftSide;
+        return leftError + rightError;
     else if (distance.leftSide <= middle.left)
-        error = 2 * (middle.left - distance.leftSide);
+        return 2 * leftError;
     else if (distance.rightSide <= middle.right)
-        error = 2 * (distance.rightSide - middle.right);
-
-    return error;
+        return 2 * rightError;
+    else
+        return 0;
 }
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
