@@ -166,9 +166,9 @@ int32_t Sensors_GetSteeringError(void)
 
     if (walls.left && walls.right)
         return leftError + rightError;
-    else if (distance.leftSide <= middle.left)
+    else if (walls.left)
         return 2 * leftError;
-    else if (distance.rightSide <= middle.right)
+    else if (walls.right)
         return 2 * rightError;
     else
         return 0;
