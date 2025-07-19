@@ -12,11 +12,11 @@ static void SetLeftPwm(int pwm)
 {
     pwm = ConstrainPwm(pwm);
     if (pwm > 0) {
-        TIM_SetCompare2(TIM4, 0);
-        TIM_SetCompare1(TIM4, pwm);
-    } else {
         TIM_SetCompare1(TIM4, 0);
-        TIM_SetCompare2(TIM4, -pwm);
+        TIM_SetCompare2(TIM4, pwm);
+    } else {
+        TIM_SetCompare2(TIM4, 0);
+        TIM_SetCompare1(TIM4, -pwm);
     }
 }
 
@@ -24,11 +24,11 @@ static void SetRightPwm(int pwm)
 {
     pwm = ConstrainPwm(pwm);
     if (pwm > 0) {
-        TIM_SetCompare3(TIM4, 0);
-        TIM_SetCompare4(TIM4, pwm);
-    } else {
         TIM_SetCompare4(TIM4, 0);
-        TIM_SetCompare3(TIM4, -pwm);
+        TIM_SetCompare3(TIM4, pwm);
+    } else {
+        TIM_SetCompare3(TIM4, 0);
+        TIM_SetCompare4(TIM4, -pwm);
     }
 }
 
