@@ -87,7 +87,7 @@
 #define MOTOR_FREQ  20000
 #define MOTOR_PWM_MAX    3600
 
-#define FAN_PWM_MAX 3600
+#define FAN_PWM_MAX 1200
 
 extern RCC_ClocksTypeDef MCU_rccClocks;
 extern volatile uint32_t MCU_millis;

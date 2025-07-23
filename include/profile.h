@@ -15,14 +15,13 @@ typedef enum {
 struct Profile {
     int32_t square;     // distance for speed profiles
     int32_t vStart, vCoast, vEnd;
-    int32_t a1, a2;
+    int32_t accel;
 
     int32_t t0, t1, t2, t3; // used internally
 };
 
 void Profile_Setup(struct Profile *profile, int32_t tStart);
 void Profile_SyncByTotalTime(struct Profile *dest, const struct Profile *src);
-void Profile_SyncByCoastTime(struct Profile *dest, const struct Profile *src);
 int32_t Profile_GetValue(const struct Profile *profile, int32_t t);
 ProfileState Profile_GetState(const struct Profile *profile, int32_t t);
 

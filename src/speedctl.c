@@ -26,13 +26,13 @@ static struct {
     int32_t minOutputThreshold;
     int32_t motorFeedForward;
 } params = {
-    .vTransKp = 7000, .vTransKi = 100, .vTransKd = 0,
-    .vRotKp = 90000, .vRotKi = 30000, .vRotKd = 0,
+    .vTransKp = 10000, .vTransKi = 200, .vTransKd = 0,
+    .vRotKp = 100000, .vRotKi = 15000, .vRotKd = 0,
     .coeffAccel = 200,
-    .coeffGyro = 900,
+    .coeffGyro = 1000,
     .coeffSensors = 10,
-    .minOutputThreshold = 50,
-    .motorFeedForward = 1900
+    .minOutputThreshold = 0,
+    .motorFeedForward = 0
 };
 
 static enum TelemetryMode {
@@ -74,6 +74,12 @@ void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
 {
     targetVTransInUmPerS = vTransInMmPerS * 1000;
     targetVRotInLsbs = (vRotInDegPerS << 15) / 2000;
+}
+
+void SpeedCtl_GetSpeed(int32_t *vTransInMmPerS, int32_t *vRotInDegPerS)
+{
+    *vTransInMmPerS = vTransInUmPerS / 1000;
+    *vRotInDegPerS = vRotInLsbs * 2000 / 32768;
 }
 
 static int32_t AdjustRegOutput(int32_t regOutput)

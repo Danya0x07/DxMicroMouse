@@ -14,18 +14,18 @@ struct MotionConfig {
 
 static struct MotionConfig configs[] = {
     [MotionMode_SLOW] = {
-        .vTransA = 400,
-        .vTransB = 360,
-        .vRot = 1000,
-        .aTrans = 2500,
-        .aRot = 5000
+        .vTransA = 600,
+        .vTransB = 400,
+        .vRot = 720,
+        .aTrans = 2000,
+        .aRot = 4000
     },
     [MotionMode_FAST] = {
-        .vTransA = 1100,
-        .vTransB = 640,
-        .vRot = 1000,
-        .aTrans = 3000,
-        .aRot = 9000
+        .vTransA = 1300,
+        .vTransB = 750,
+        .vRot = 1080,
+        .aTrans = 4000,
+        .aRot = 8000
     }
 };
 
@@ -171,8 +171,6 @@ static void Start(const struct MotionCtlBlock *m)
     }
 
     vTransProfile.square = m->distanceInMm + correction.distanceInMm;
-    correction.distanceInMm = 0;
-    vTransProfile.a1 = vTransProfile.a2 = config->aTrans;
     vTransProfile.vStart = vTransProfile.vEnd;
 
     if (discreteMotion) {
@@ -210,20 +208,31 @@ static void Start(const struct MotionCtlBlock *m)
             vTransProfile.vEnd = config->vTransA;
             break;
     }
+    vTransProfile.accel = config->aTrans;
 
     vRotProfile.square = m->angleInDeg;
-    vRotProfile.a1 = vRotProfile.a2 = config->aRot;
-    vRotProfile.vStart = vRotProfile.vEnd = 0;
+    vRotProfile.vStart = 0;
     vRotProfile.vCoast = config->vRot;
+    vRotProfile.vEnd = 0;
+    vRotProfile.accel = config->aRot;
 
-    if (m->distanceInMm != 0) {
+    if (vTransProfile.square != 0) {
         Profile_Setup(&vTransProfile, Millis_Get());
-        Profile_SyncByTotalTime(&vRotProfile, &vTransProfile);
+
+        if (vRotProfile.square != 0) {
+            Profile_Setup(&vRotProfile, Millis_Get());
+
+            if (vTransProfile.t3 - vTransProfile.t0 >= vRotProfile.t3 - vRotProfile.t0)
+                Profile_SyncByTotalTime(&vRotProfile, &vTransProfile);
+            else
+                Profile_SyncByTotalTime(&vTransProfile, &vRotProfile);
+        }
     }
     else {
         Profile_Setup(&vRotProfile, Millis_Get());
     }
 
+    correction.distanceInMm = 0;
     ongoing = true;
 }
 
