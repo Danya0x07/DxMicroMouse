@@ -22,21 +22,33 @@ void Profile_Setup(struct Profile *profile, int32_t tStart)
 
     if (tCoast < 0) {   // Целевая скорость vCoast недостижима для заданных условий
         tCoast = 0;
-        int32_t s = (square - abs(v0*v0 - v2*v2) / (2*a)) / 2;
-        int32_t discriminant = v0*v0 + 2*a*s;
-        tAcc1 = 1000 * (SquareRootRounded(discriminant) - v0) / a;
-        v1 = ((a * tAcc1 / 100) + 5) / 10 + v0;
+
+        if ((v2 < v1 && v1 > v0) || (v2 > v1 && v1 < v0)) {
+            int32_t vs = v1 >= v0 ? max(v0, v2) : min(v0, v2);
+            int32_t s = (square - abs(v0*v0 - v2*v2) / (2*a)) / 2;
+            s = max(s, 0);
+            int32_t discriminant = vs*vs + 2*a1*s;
+            int32_t tAcc = 1000 * (SquareRootRounded(discriminant) - vs) / a1;
+            v1 = ((a1 * tAcc / 100) + 5) / 10 + vs;
+        }
+        else {
+            int32_t discriminant = v0*v0 + 2*a1*square;
+            int32_t tAcc = 1000 * (SquareRootRounded(discriminant) - v0) / a1;
+            v2 = v1 = ((a1 * tAcc / 100) + 5) / 10 + v0;
+        }
+
+        tAcc1 = 1000 * abs(v1 - v0) / a;
         tAcc2 = 1000 * abs(v2 - v1) / a;
     }
-
-    profile->vStart = v0 * sign;
-    profile->vCoast = v1 * sign;
-    profile->vEnd = v2 * sign;
 
     profile->t0 = tStart;
     profile->t1 = profile->t0 + tAcc1;
     profile->t2 = profile->t1 + tCoast;
     profile->t3 = profile->t2 + tAcc2;
+
+    profile->vStart = v0 * sign;
+    profile->vCoast = v1 * sign;
+    profile->vEnd = (1000 * profile->vCoast + a2 * sign * tAcc2) / 1000;
 }
 
 void Profile_SyncByTotalTime(struct Profile *dest, const struct Profile *src)

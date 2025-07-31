@@ -11,4 +11,12 @@ int32_t ln1000(int32_t adc12BitValue);
 uint32_t SquareRootRounded(uint32_t input);
 uint16_t Crc16(const uint8_t *data, unsigned len);
 
+#ifndef max
+#   define max(a, b)    ((a) > (b) ? (a) : (b))
+#endif
+
+#ifndef min
+#   define min(a, b)    ((a) < (b) ? (a) : (b))
+#endif
+
 #endif // _INC_UTILS_H
