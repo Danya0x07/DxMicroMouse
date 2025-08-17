@@ -445,6 +445,9 @@ static Speeds _BTR_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
         case 1:
             return ChooseDefaultSpeeds(0, 0);
         case 2:
+            Millis_Wait(200);
+            SpeedCtl_Reset();
+            Millis_Wait(200);
             if (disposableBacktrimCallback) {
                 disposableBacktrimCallback();
                 disposableBacktrimCallback = NULL;
