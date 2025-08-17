@@ -1,52 +1,63 @@
 #ifndef _INC_MOTION_H
 #define _INC_MOTION_H
 
-#include "module.h"
+#include "mcu.h"
 
-enum MotionMode {
-    MotionMode_SLOW,
-    MotionMode_FAST,
+struct MotionConfig {
+    int32_t aTrans;
+    int32_t aRot;
 };
 
-struct MotionCorrection {
+struct Motion {
     int32_t distanceInMm;
+    int32_t angleInDeg;
 };
 
-enum Motion {
-    Motion_PARK_BACK2WALL,
-    Motion_PARK_FWD2DP,
-    Motion_PARK_FWD2DP_ACC2SLOW,
+extern const struct Motion
+    MOTION_BACK_PARK_1,
+    MOTION_BACK_PARK_2,
+    MOTION_FWD_UNPARK2M,
+    MOTION_FWD_UNPARK2C,
+    MOTION_FWD_M2M,
+    MOTION_FWD_M2T90,
+    MOTION_FWD_M2C,
+    MOTION_LS90_1,
+    MOTION_LS90_2,
+    MOTION_RS90_1,
+    MOTION_RS90_2,
+    MOTION_LP90_1,
+    MOTION_LP90_2,
+    MOTION_RP90_1,
+    MOTION_RP90_2,
+    MOTION_LP180_1,
+    MOTION_LP180_2,
+    MOTION_RP180_1,
+    MOTION_RP180_2,
+    MOTION_LS180_1,
+    MOTION_LS180_2,
+    MOTION_RS180_1,
+    MOTION_RS180_2,
+    MOTION_FWD_C245,
+    MOTION_FWD_C2135,
+    MOTION_LS45_1,
+    MOTION_LS45_2,
+    MOTION_RS45_1,
+    MOTION_RS45_2,
+    MOTION_LS135_1,
+    MOTION_LS135_2,
+    MOTION_RS135_1,
+    MOTION_RS135_2,
+    MOTION_DFWD,
+    MOTION_DFWD_D2D,
+    MOTION_LS90_D2D_1,
+    MOTION_LS90_D2D_2,
+    MOTION_RS90_D2D_1,
+    MOTION_RS90_D2D_2
+;
 
-    Motion_FWD_DP2DP,
-    Motion_FWD_DP2DP_DECC,
-    Motion_FWD_DP2DP_SLOW,
-    Motion_FWD_DP2DP_ACC,
-
-    Motion_FWD_DP2T,
-    Motion_FWD_T2DP,
-
-    Motion_FWD_DP2C,
-    Motion_FWD_DP2C_FROMSLOW,
-
-    Motion_SMOOTH_LEFT90,
-    Motion_SMOOTH_RIGHT90,
-    Motion_SMOOTH_LEFT90_LONG,
-    Motion_SMOOTH_RIGHT90_LONG,
-
-    Motion_PIVOT_LEFT90,
-    Motion_PIVOT_RIGHT90,
-    Motion_PIVOT_LEFT180,
-    Motion_PIVOT_RIGHT180,
-};
-
-void Motion_SetMode(enum MotionMode newMode);
-void Motion_SetDiscreteMotion(FunctionalState newState);
-void Motion_Start(enum Motion motion);
+void Motion_Configure(const struct MotionConfig *newConfig);
+void Motion_Start(const struct Motion *motion, int32_t endVTrans, int32_t endVRot);
 bool Motion_IsOngoing(void);
 void Motion_Update(void);
-void Motion_SetCorrection(struct MotionCorrection newCorrection);
-struct MotionCorrection Motion_GetCorrection(void);
-
-extern struct Module Motion_module;
 
 #endif // _INC_MOTION_H

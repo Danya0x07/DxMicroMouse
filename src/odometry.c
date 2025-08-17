@@ -8,8 +8,8 @@
 #define COUNTS_TO_TRANSITION    6198
 
 static struct Odometry {
-    int32_t distance;
-    int32_t angle;
+    int distance;
+    int angle;
 } prediction;
 
 static int64_t angleInmLsb;
@@ -24,10 +24,10 @@ void Odometry_Reset()
     distanceInCounts = 0;
 }
 
-void Odometry_SetReckon(int32_t distanceInMm, int32_t angleInDeg)
+void Odometry_SetReckon(int distanceInMm, int angleInDeg)
 {
-    distanceInCounts = distanceInMm * COUNTS_PER_MM;
-    angleInmLsb = (angleInDeg << 15) / 2;
+    distanceInCounts = (int32_t)distanceInMm * COUNTS_PER_MM;
+    angleInmLsb = ((int64_t)angleInDeg << 15) / 2;
 }
 
 void Odometry_UpdateReckon(int32_t transInCounts, int32_t rotInMimuUnits)
@@ -36,7 +36,7 @@ void Odometry_UpdateReckon(int32_t transInCounts, int32_t rotInMimuUnits)
     distanceInCounts += transInCounts;
 }
 
-void Odometry_GetReckon(int32_t *distanceInMm, int32_t *angleInDeg)
+void Odometry_GetReckon(int *distanceInMm, int *angleInDeg)
 {
     *distanceInMm = distanceInCounts / COUNTS_PER_MM;
     *angleInDeg = NormalizeAngleDegrees(angleInmLsb * 2 / 32768);
@@ -44,36 +44,36 @@ void Odometry_GetReckon(int32_t *distanceInMm, int32_t *angleInDeg)
 
 void Odometry_SnapReckon(void)
 {
-    int32_t traversedCells = distanceInCounts / COUNTS_PER_CELL;
-    distanceInCounts = COUNTS_PER_CELL * traversedCells + COUNTS_TO_TRANSITION;
+    int traversedCells = distanceInCounts / COUNTS_PER_CELL;
+    distanceInCounts = (int32_t)COUNTS_PER_CELL * traversedCells + COUNTS_TO_TRANSITION;
 }
 
-void Odometry_SetPrediction(int32_t distanceInMm, int32_t angleInDeg)
+void Odometry_SetPrediction(int distanceInMm, int angleInDeg)
 {
     prediction.distance = distanceInMm;
     prediction.angle = angleInDeg;
 }
 
-void Odometry_UpdatePrediction(int32_t transInMm, int32_t rotInDeg)
+void Odometry_UpdatePrediction(int transInMm, int rotInDeg)
 {
     prediction.distance += transInMm;
     prediction.angle += rotInDeg;
 }
 
-void Odometry_GetPrediction(int32_t *distanceInMm, int32_t *angleInDeg)
+void Odometry_GetPrediction(int *distanceInMm, int *angleInDeg)
 {
     *distanceInMm = prediction.distance;
     *angleInDeg = prediction.angle;
 }
 
-void Odometry_GetFusion(int32_t *distanceInMm, int32_t *angleInDeg)
+void Odometry_GetFusion(int *distanceInMm, int *angleInDeg)
 {
-    int32_t reckonDistance, reckonAngle;
+    int reckonDistance, reckonAngle;
     int32_t fusionDistance, fusionAngle;
 
     Odometry_GetReckon(&reckonDistance, &reckonAngle);
 
-    fusionDistance = (coeffAlpha * prediction.distance + (1000 - coeffAlpha) * reckonDistance) / 100;
+    fusionDistance = ((int32_t)coeffAlpha * prediction.distance + (1000 - coeffAlpha) * reckonDistance) / 100;
     fusionDistance += fusionDistance > 0 ? 5 : -5;
     fusionDistance /= 10;
 
@@ -111,10 +111,10 @@ static int execute(int argc, char *argv[])
 
 static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
 {
-    int32_t distance, angle;
+    int distance, angle;
 
     Odometry_GetFusion(&distance, &angle);
-    snprintf(out, TELEMETRY_STRING_SIZE, "d: %ld\tang: %ld\n", distance, angle);
+    snprintf(out, TELEMETRY_STRING_SIZE, "d: %d\tang: %d\n", distance, angle);
 }
 
 static struct ModuleTelemetry telemetry = {

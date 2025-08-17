@@ -1,255 +1,227 @@
 #include "motion.h"
 #include "profile.h"
 #include "speedctl.h"
-#include <string.h>
-#include <stdlib.h>
+#include "utils.h"
 
-struct MotionConfig {
-    int32_t vTransA;
-    int32_t vTransB;
-    int32_t vRot;
-    int32_t aTrans;
-    int32_t aRot;
-};
-
-static struct MotionConfig configs[] = {
-    [MotionMode_SLOW] = {
-        .vTransA = 600,
-        .vTransB = 400,
-        .vRot = 720,
-        .aTrans = 2000,
-        .aRot = 4000
-    },
-    [MotionMode_FAST] = {
-        .vTransA = 1300,
-        .vTransB = 750,
-        .vRot = 1080,
-        .aTrans = 4000,
-        .aRot = 8000
-    }
-};
-
-static struct MotionConfig *config = &configs[MotionMode_SLOW];
+#include <stdio.h>
 
 #define CELLWIDTH   180
 #define CELLHALF    90
 #define WALLTHICKNESS   12
 #define MOUSEBACKLEN    30
 
-static const struct MotionCtlBlock {
-    int32_t distanceInMm;
-    int32_t angleInDeg;
-    enum VTransChange {
-        VTransChange_A2A,
-        VTransChange_B2B,
-        VTransChange_A20,
-        VTransChange_B20,
-        VTransChange_A2B,
-        VTransChange_B2A
-    } vTransChange;
-} motions[] = {
-    [Motion_PARK_BACK2WALL] = {
-        .distanceInMm = -(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 7),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_B20
-    },
-    [Motion_PARK_FWD2DP] = {
-        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + CELLHALF),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_A2A
-    },
-    [Motion_PARK_FWD2DP_ACC2SLOW] = {
-        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + CELLHALF),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_B2B
-    },
-    [Motion_FWD_DP2DP] = {
-        .distanceInMm = +(CELLWIDTH),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_A2A
-    },
-    [Motion_FWD_DP2DP_DECC] = {
-        .distanceInMm = +(CELLWIDTH),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_A2B
-    },
-    [Motion_FWD_DP2DP_SLOW] = {
-        .distanceInMm = +(CELLWIDTH),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_B2B
-    },
-    [Motion_FWD_DP2DP_ACC] = {
-        .distanceInMm = +(CELLWIDTH),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_B2A
-    },
-    [Motion_FWD_DP2T] = {
-        .distanceInMm = 20,
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_A2B
-    },
-    [Motion_FWD_T2DP] = {
-        .distanceInMm = 20,
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_B2A
-    },
-    [Motion_FWD_DP2C] = {
-        .distanceInMm = +(CELLHALF),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_A20
-    },
-    [Motion_FWD_DP2C_FROMSLOW] = {
-        .distanceInMm = +(CELLHALF),
-        .angleInDeg = 0,
-        .vTransChange = VTransChange_B20
-    },
-    [Motion_SMOOTH_LEFT90] = {
-        .distanceInMm = 110,
-        .angleInDeg = 90,
-        .vTransChange = VTransChange_B2B
-    },
-    [Motion_SMOOTH_RIGHT90] = {
-        .distanceInMm = 110,
-        .angleInDeg = -90,
-        .vTransChange = VTransChange_B2B
-    },
-    [Motion_SMOOTH_LEFT90_LONG] = {
-        .distanceInMm = 142,
-        .angleInDeg = 90,
-        .vTransChange = VTransChange_B2B
-    },
-    [Motion_SMOOTH_RIGHT90_LONG] = {
-        .distanceInMm = 142,
-        .angleInDeg = -90,
-        .vTransChange = VTransChange_B2B
-    },
-    [Motion_PIVOT_LEFT90] = {
-        .distanceInMm = 0,
-        .angleInDeg = 90,
-        .vTransChange = VTransChange_B20
-    },
-    [Motion_PIVOT_RIGHT90] = {
-        .distanceInMm = 0,
-        .angleInDeg = -90,
-        .vTransChange = VTransChange_B20
-    },
-    [Motion_PIVOT_LEFT180] = {
-        .distanceInMm = 0,
-        .angleInDeg = 180,
-        .vTransChange = VTransChange_B20
-    },
-    [Motion_PIVOT_RIGHT180] = {
-        .distanceInMm = 0,
-        .angleInDeg = -180,
-        .vTransChange = VTransChange_B20
-    },
-};
+#define FIRSTHALF(x)    ((x) / 2)
+#define SECONDHALF(x)   ((x) - FIRSTHALF(x))
 
-#define MAXIMUM_ALLOWED_CORRECTION  20
+const struct Motion
+    MOTION_BACK_PARK_1 = {
+        .distanceInMm = FIRSTHALF(-(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 7)),
+        .angleInDeg = 0
+    },
+    MOTION_BACK_PARK_2 = {
+        .distanceInMm = SECONDHALF(-(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 7)),
+        .angleInDeg = 0
+    },
+    MOTION_FWD_UNPARK2M = {
+        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + CELLHALF),
+        .angleInDeg = 0
+    },
+    MOTION_FWD_UNPARK2C = {
+        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2),
+        .angleInDeg = 0
+    },
+    MOTION_FWD_M2M = {
+        .distanceInMm = +(CELLWIDTH),
+        .angleInDeg = 0
+    },
+    MOTION_FWD_M2T90 = {
+        .distanceInMm = 20,
+        .angleInDeg = 0
+    },
+    MOTION_FWD_M2C = {
+        .distanceInMm = +(CELLHALF),
+        .angleInDeg = 0
+    },
+    MOTION_LS90_1 = {
+        .distanceInMm = FIRSTHALF(110),
+        .angleInDeg = FIRSTHALF(90)
+    },
+    MOTION_LS90_2 = {
+        .distanceInMm = SECONDHALF(110),
+        .angleInDeg = SECONDHALF(90)
+    },
+    MOTION_RS90_1 = {
+        .distanceInMm = FIRSTHALF(110),
+        .angleInDeg = FIRSTHALF(-90)
+    },
+    MOTION_RS90_2 = {
+        .distanceInMm = SECONDHALF(110),
+        .angleInDeg = SECONDHALF(-90)
+    },
+    MOTION_LP90_1 = {
+        .distanceInMm = 0,
+        .angleInDeg = FIRSTHALF(90)
+    },
+    MOTION_LP90_2 = {
+        .distanceInMm = 0,
+        .angleInDeg = SECONDHALF(90)
+    },
+    MOTION_RP90_1 = {
+        .distanceInMm = 0,
+        .angleInDeg = FIRSTHALF(-90)
+    },
+    MOTION_RP90_2 = {
+        .distanceInMm = 0,
+        .angleInDeg = SECONDHALF(-90)
+    },
+    MOTION_LP180_1 = {
+        .distanceInMm = 0,
+        .angleInDeg = FIRSTHALF(180)
+    },
+    MOTION_LP180_2 = {
+        .distanceInMm = 0,
+        .angleInDeg = SECONDHALF(180)
+    },
+    MOTION_RP180_1 = {
+        .distanceInMm = 0,
+        .angleInDeg = FIRSTHALF(-180)
+    },
+    MOTION_RP180_2 = {
+        .distanceInMm = 0,
+        .angleInDeg = SECONDHALF(-180)
+    },
+    // Used only in speed run
+    MOTION_LS180_1 = {
+        .distanceInMm = FIRSTHALF(283),
+        .angleInDeg = FIRSTHALF(180)
+    },
+    MOTION_LS180_2 = {
+        .distanceInMm = SECONDHALF(283),
+        .angleInDeg = SECONDHALF(180)
+    },
+    MOTION_RS180_1 = {
+        .distanceInMm = FIRSTHALF(283),
+        .angleInDeg = FIRSTHALF(-180)
+    },
+    MOTION_RS180_2 = {
+        .distanceInMm = SECONDHALF(283),
+        .angleInDeg = SECONDHALF(-180)
+    },
+    MOTION_FWD_C245 = {
+        .distanceInMm = 26,
+        .angleInDeg = 0
+    },
+    MOTION_FWD_C2135 = {
+        .distanceInMm = 79,
+        .angleInDeg = 0
+    },
+    MOTION_LS45_1 = {
+        .distanceInMm = FIRSTHALF(121),
+        .angleInDeg = FIRSTHALF(45)
+    },
+    MOTION_LS45_2 = {
+        .distanceInMm = SECONDHALF(121),
+        .angleInDeg = SECONDHALF(45)
+    },
+    MOTION_RS45_1 = {
+        .distanceInMm = FIRSTHALF(121),
+        .angleInDeg = FIRSTHALF(-45)
+    },
+    MOTION_RS45_2 = {
+        .distanceInMm = SECONDHALF(121),
+        .angleInDeg = SECONDHALF(-45)
+    },
+    MOTION_LS135_1 = {
+        .distanceInMm = FIRSTHALF(186),
+        .angleInDeg = FIRSTHALF(135)
+    },
+    MOTION_LS135_2 = {
+        .distanceInMm = SECONDHALF(186),
+        .angleInDeg = SECONDHALF(135)
+    },
+    MOTION_RS135_1 = {
+        .distanceInMm = FIRSTHALF(186),
+        .angleInDeg = FIRSTHALF(-135)
+    },
+    MOTION_RS135_2 = {
+        .distanceInMm = SECONDHALF(186),
+        .angleInDeg = SECONDHALF(-135)
+    },
+    MOTION_DFWD = {
+        .distanceInMm = 127,
+        .angleInDeg = 0
+    },
+    MOTION_DFWD_D2D = {
+        .distanceInMm = 101,
+        .angleInDeg = 0
+    },
+    MOTION_LS90_D2D_1 = {
+        .distanceInMm = FIRSTHALF(141),
+        .angleInDeg = FIRSTHALF(90)
+    },
+    MOTION_LS90_D2D_2 = {
+        .distanceInMm = SECONDHALF(141),
+        .angleInDeg = SECONDHALF(90)
+    },
+    MOTION_RS90_D2D_1 = {
+        .distanceInMm = FIRSTHALF(141),
+        .angleInDeg = FIRSTHALF(-90)
+    },
+    MOTION_RS90_D2D_2 = {
+        .distanceInMm = SECONDHALF(141),
+        .angleInDeg = SECONDHALF(-90)
+    }
+;
 
-static struct MotionCorrection correction = {0};
+static struct MotionConfig config = {.aTrans = 4000, .aRot = 5000};
 static struct Profile vTransProfile, vRotProfile;
 static bool ongoing = false;
-static FunctionalState discreteMotion = DISABLE;
 
-static void Configure(const struct MotionConfig *newConfig)
+void Motion_Configure(const struct MotionConfig *newConfig)
 {
-    if (newConfig->vTransA > 0 && newConfig->vTransB > 0 &&
-            newConfig->vRot > 0 && newConfig->aTrans > 0 && newConfig->aRot > 0)
-        *config = *newConfig;
+    if (newConfig->aTrans > 0 && newConfig->aRot > 0)
+        config = *newConfig;
 }
 
-static void Start(const struct MotionCtlBlock *m)
+void Motion_Start(const struct Motion *motion, int32_t endVTrans, int32_t endVRot)
 {
-    if (m->distanceInMm > 0) {
-        if (correction.distanceInMm < -MAXIMUM_ALLOWED_CORRECTION)
-            correction.distanceInMm = -MAXIMUM_ALLOWED_CORRECTION;
-    }
-    else {
-        if (correction.distanceInMm > MAXIMUM_ALLOWED_CORRECTION)
-            correction.distanceInMm = MAXIMUM_ALLOWED_CORRECTION;
-    }
+    struct ProfileParams vTransParams = {
+        .square = motion->distanceInMm,
+        .vStart = vTransProfile.vEnd,
+        .vEnd = endVTrans * !!motion->distanceInMm,
+        .accel = config.aTrans
+    };
 
-    vTransProfile.square = m->distanceInMm + correction.distanceInMm;
-    vTransProfile.vStart = vTransProfile.vEnd;
+    struct ProfileParams vRotParams = {
+        .square = motion->angleInDeg,
+        .vStart = vRotProfile.vEnd,
+        .vEnd = endVRot * !!motion->angleInDeg,
+        .accel = config.aRot
+    };
 
-    if (discreteMotion) {
-        vTransProfile.vCoast = config->vTransB;
-        vTransProfile.vEnd = 0;
-    }
-    else switch (m->vTransChange) {
-        case VTransChange_A2A:
-            vTransProfile.vCoast = config->vTransA;
-            vTransProfile.vEnd = config->vTransA;
-            break;
+    int32_t t = Millis_Get();
 
-        case VTransChange_B2B:
-            vTransProfile.vCoast = config->vTransB;
-            vTransProfile.vEnd = config->vTransB;
-            break;
+    if (motion->distanceInMm != 0) {
+        Profile_Setup(&vTransProfile, &vTransParams, t);
 
-        case VTransChange_A20:
-            vTransProfile.vCoast = config->vTransA;
-            vTransProfile.vEnd = 0;
-            break;
+        if (motion->angleInDeg != 0) {
+            Profile_Setup(&vRotProfile, &vRotParams, t);
 
-        case VTransChange_B20:
-            vTransProfile.vCoast = config->vTransB;
-            vTransProfile.vEnd = 0;
-            break;
-
-        case VTransChange_A2B:
-            vTransProfile.vCoast = config->vTransA;
-            vTransProfile.vEnd = config->vTransB;
-            break;
-
-        case VTransChange_B2A:
-            vTransProfile.vCoast = config->vTransB;
-            vTransProfile.vEnd = config->vTransA;
-            break;
-    }
-    vTransProfile.accel = config->aTrans;
-
-    vRotProfile.square = m->angleInDeg;
-    vRotProfile.vStart = 0;
-    vRotProfile.vCoast = config->vRot;
-    vRotProfile.vEnd = 0;
-    vRotProfile.accel = config->aRot;
-
-    if (vTransProfile.square != 0) {
-        Profile_Setup(&vTransProfile, Millis_Get());
-
-        if (vRotProfile.square != 0) {
-            Profile_Setup(&vRotProfile, Millis_Get());
-
-            if (vTransProfile.t3 - vTransProfile.t0 >= vRotProfile.t3 - vRotProfile.t0)
-                Profile_SyncByTotalTime(&vRotProfile, &vTransProfile);
-            else
-                Profile_SyncByTotalTime(&vTransProfile, &vRotProfile);
+            if (vTransProfile.t2 - vTransProfile.t0 >= vRotProfile.t2 - vRotProfile.t0) {
+                Profile_SyncByTotalTime(&vRotProfile, &vRotParams, &vTransProfile);
+                //~ printf("R s:%ld vs:%ld ve:%ld a1:%ld a2:%ld\n", vRotParams.square, vRotProfile.vStart, vRotProfile.vEnd, vRotProfile.a1,  vRotProfile.a2);
+            }
+            else {
+                Profile_SyncByTotalTime(&vTransProfile, &vTransParams, &vRotProfile);
+                //~ printf("T s:%ld vs:%ld ve:%ld a1:%ld a2:%ld\n", vTransParams.square, vTransProfile.vStart, vTransProfile.vEnd, vTransProfile.a1,  vTransProfile.a2);
+            }
         }
     }
-    else {
-        Profile_Setup(&vRotProfile, Millis_Get());
+    else if (motion->angleInDeg != 0) {
+        Profile_Setup(&vRotProfile, &vRotParams, t);
     }
 
-    correction.distanceInMm = 0;
     ongoing = true;
-}
-
-void Motion_SetMode(enum MotionMode newMode)
-{
-    config = &configs[newMode];
-}
-
-void Motion_SetDiscreteMotion(FunctionalState newState)
-{
-    discreteMotion = newState;
-}
-
-void Motion_Start(enum Motion motion)
-{
-    //printf("Motion: %d, derr: %ld\n", motion, correction.distanceInMm);
-    Start(&motions[motion]);
 }
 
 bool Motion_IsOngoing(void)
@@ -273,75 +245,3 @@ void Motion_Update(void)
             && Profile_GetState(&vRotProfile, t) == ProfileState_FINISHED)
         ongoing = false;
 }
-
-void Motion_SetCorrection(struct MotionCorrection newCorrection)
-{
-    correction = newCorrection;
-}
-
-struct MotionCorrection Motion_GetCorrection(void)
-{
-    return correction;
-}
-
-static int execute(int argc, char *argv[])
-{
-    if (argc < 1)
-        return -1;
-
-    if (!strcmp(argv[0], "set") && argc == 6) {
-        struct MotionConfig newConfig = {
-            .vTransA = atoi(argv[1]),
-            .vTransB = atoi(argv[2]),
-            .vRot = atoi(argv[3]),
-            .aTrans = atoi(argv[4]),
-            .aRot = atoi(argv[5])
-        };
-        Configure(&newConfig);
-    }
-    else if (!strcmp(argv[0], "mode") && argc == 2) {
-        enum MotionMode newMode = (enum MotionMode)(atoi(argv[1]) & 1);
-        Motion_SetMode(newMode);
-    }
-    else if (!strcmp(argv[0], "mv") && argc == 3) {
-        struct MotionCtlBlock motion = {
-            .distanceInMm = atoi(argv[1]),
-            .angleInDeg = atoi(argv[2]),
-            .vTransChange = VTransChange_A20
-        };
-        Start(&motion);
-    }
-    else if (!strcmp(argv[0], "ps")) {
-        printf("Motion config:\n"
-               "Va: %ld\tVb: %ld\tAt: %ld\n"
-               "Wc: %ld\tAr: %ld\n",
-               config->vTransA, config->vTransB, config->aTrans,
-               config->vRot, config->aRot);
-    }
-    else
-        return -2;
-
-    return 0;
-}
-
-static void load(const uint8_t *buffer)
-{
-    memcpy(configs, buffer, sizeof(configs));
-}
-
-static void save(uint8_t *buffer)
-{
-    memcpy(buffer, configs, sizeof(configs));
-}
-
-static struct ModuleSettings settings = {
-    .dataSize = sizeof(configs),
-    .load = load,
-    .save = save
-};
-
-struct Module Motion_module = {
-    .name = "motion",
-    .execute = execute,
-    .settings = &settings
-};

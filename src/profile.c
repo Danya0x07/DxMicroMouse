@@ -3,106 +3,150 @@
 
 #include <stdlib.h>
 
-void Profile_Setup(struct Profile *profile, int32_t tStart)
+void Profile_Setup(struct Profile *profile, const struct ProfileParams *params, int32_t tStart)
 {
-    int32_t sign = profile->square >= 0 ? 1 : -1;
-    int32_t square = abs(profile->square);
+    int32_t sign = params->square >= 0 ? 1 : -1;
+    int32_t square = abs(params->square);
+    int32_t vStart = abs(params->vStart);
+    int32_t vEnd = abs(params->vEnd);
+    int32_t accel = abs(params->accel);
 
-    int32_t v0 = abs(profile->vStart);
-    int32_t v1 = abs(profile->vCoast);
-    int32_t v2 = abs(profile->vEnd);
+    int32_t t01, t12;
+    int32_t a1, a2;
 
-    int32_t a = profile->accel;
-    int32_t a1 = v1 >= v0 ? a : -a;
-    int32_t a2 = v2 >= v1 ? a : -a;
+    /*                     __                      __                        __
+     * v_end > v_start => /   , v_end < v_start =>   \ , v_end == v_start =>
+     */
+    if (vEnd > vStart) {
+        int32_t squareToAccelerate = (vEnd*vEnd - vStart*vStart) / (2*accel);
 
-    int32_t tAcc1 = 1000 * (v1 - v0) / a1;
-    int32_t tAcc2 = 1000 * (v2 - v1) / a2;
-    int32_t tCoast = (1000 * square - tAcc1 * (v0+v1)/2 - tAcc2 * (v1+v2)/2) / v1;
-
-    if (tCoast < 0) {   // Целевая скорость vCoast недостижима для заданных условий
-        tCoast = 0;
-
-        if ((v2 < v1 && v1 > v0) || (v2 > v1 && v1 < v0)) {
-            int32_t vs = v1 >= v0 ? max(v0, v2) : min(v0, v2);
-            int32_t s = (square - abs(v0*v0 - v2*v2) / (2*a)) / 2;
-            s = max(s, 0);
-            int32_t discriminant = vs*vs + 2*a1*s;
-            int32_t tAcc = 1000 * (SquareRootRounded(discriminant) - vs) / a1;
-            v1 = ((a1 * tAcc / 100) + 5) / 10 + vs;
+        if (squareToAccelerate > square) {
+            vEnd = SquareRootRounded(2*accel*square + vStart*vStart);
+            squareToAccelerate = square;
         }
-        else {
-            int32_t discriminant = v0*v0 + 2*a1*square;
-            int32_t tAcc = 1000 * (SquareRootRounded(discriminant) - v0) / a1;
-            v2 = v1 = ((a1 * tAcc / 100) + 5) / 10 + v0;
-        }
-
-        tAcc1 = 1000 * abs(v1 - v0) / a;
-        tAcc2 = 1000 * abs(v2 - v1) / a;
+        t01 = 1000 * (vEnd - vStart) / accel;
+        t12 = 1000 * (square - squareToAccelerate) / vEnd;
+        a1 = accel;
+        a2 = 0;
     }
+    else if (vEnd < vStart) {
+        int32_t squareToAccelerate = (vEnd*vEnd - vStart*vStart) / (-2*accel);
 
-    profile->t0 = tStart;
-    profile->t1 = profile->t0 + tAcc1;
-    profile->t2 = profile->t1 + tCoast;
-    profile->t3 = profile->t2 + tAcc2;
-
-    profile->vStart = v0 * sign;
-    profile->vCoast = v1 * sign;
-    profile->vEnd = (1000 * profile->vCoast + a2 * sign * tAcc2) / 1000;
-}
-
-void Profile_SyncByTotalTime(struct Profile *dest, const struct Profile *src)
-{
-    int32_t sign = dest->square >= 0 ? 1 : -1;
-    int32_t square = abs(dest->square);
-    int32_t v0 = abs(dest->vStart);
-    int32_t v2 = abs(dest->vEnd);
-    int32_t a = dest->accel;
-
-    int32_t b = src->t3 - src->t0 + 1000 * (v2 + v0) / a;
-    int32_t discriminant = b * b - ((int64_t)4000000 * square + (int64_t)4000000 * (v2*v2 + v0*v0) / (2*a)) / a;
-    int32_t v1;
-
-    if (discriminant >= 0) {
-        v1 = (b - SquareRootRounded((uint32_t)discriminant)) * a / 200;
+        if (squareToAccelerate > square) {
+            vEnd = SquareRootRounded(-2*accel*square + vStart*vStart);
+            squareToAccelerate = square;
+        }
+        t01 = 1000 * (square - squareToAccelerate) / vStart;
+        t12 = 1000 * (vEnd - vStart) / -accel;
+        a1 = 0;
+        a2 = -accel;
     }
     else {
-        v1 = b * a / 200;
+        t01 = 0;
+        t12 = 1000 * square / vStart;
+        a1 = a2 = 0;
     }
-    v1 += 5;
-    v1 /= 10;
 
-    dest->vStart = sign * v0;
-    dest->vCoast = sign * v1;
-    dest->vEnd = sign * v2;
+    profile->vStart = vStart * sign;
+    profile->vEnd = vEnd * sign;
+    profile->a1 = a1 * sign;
+    profile->a2 = a2 * sign;
 
-    dest->t0 = src->t0;
-    dest->t3 = src->t3;
-    dest->t1 = src->t0 + abs(v1 - v0) * 1000 / a;
-    dest->t2 = src->t3 - abs(v2 - v1) * 1000 / a;
+    profile->t0 = tStart;
+    profile->t1 = profile->t0 + t01;
+    profile->t2 = profile->t1 + t12;
+}
+
+void Profile_SyncByTotalTime(struct Profile *dest, const struct ProfileParams *params, const struct Profile *src)
+{
+    int32_t sign = params->square >= 0 ? 1 : -1;
+    int32_t square = abs(params->square);
+    int32_t vStart = abs(params->vStart);
+    int32_t vEnd = abs(params->vEnd);
+    int32_t accel = abs(params->accel);
+    int32_t t0 = src->t0;
+    int32_t t2 = src->t2;
+
+    int32_t srcVstart = abs(src->vStart);
+    int32_t srcVend = abs(src->vEnd);
+
+    int32_t tTotal = t2 - t0;
+    int32_t squareIfOnlyCoast = vStart * tTotal;
+
+    int32_t a1, a2;
+    int32_t t1;
+
+    if (square > squareIfOnlyCoast) {  /* / */
+        if (srcVstart <= srcVend) {
+            int32_t remaining = square - squareIfOnlyCoast;
+            int32_t discriminant = tTotal*tTotal - (int64_t)2000000*remaining/accel;
+            if (discriminant < 0)
+                discriminant = 0;
+
+            int32_t tAcc = tTotal - SquareRootRounded(discriminant);
+            vEnd = vStart + accel * tAcc / 1000;
+            t1 = t0 + tAcc;
+            a1 = accel;
+            a2 = 0;
+        }
+        else {
+            int32_t tAcc = 1000 * (vEnd - vStart) / accel;
+            t1 = t2 - tAcc;
+            a1 = 0;
+            a2 = accel;
+        }
+    }
+    else if (square < squareIfOnlyCoast) { /* \ */
+        if (srcVend <= srcVstart) {
+            int32_t tAcc = 1000 * (vStart - vEnd) / accel;
+            t1 = t2 - tAcc;
+            a1 = 0;
+            a2 = -accel;
+        }
+        else {
+            int32_t remaining = squareIfOnlyCoast - square;
+            int32_t discriminant = tTotal*tTotal - (int64_t)2000000*remaining/accel;
+            if (discriminant < 0)
+                discriminant = 0;
+
+            int32_t tAcc = tTotal - SquareRootRounded(discriminant);
+            t1 = t0 + tAcc;
+            vEnd = vStart - accel * tAcc / 1000;
+            a1 = -accel;
+            a2 = 0;
+        }
+    }
+    else { /* - */
+        vEnd = vStart;
+        t1 = t0;
+        a1 = a2 = 0;
+    }
+
+    dest->vStart = vStart * sign;
+    dest->vEnd = vEnd * sign;
+    dest->a1 = a1 * sign;
+    dest->a2 = a2 * sign;
+
+    dest->t0 = t0;
+    dest->t1 = t1;
+    dest->t2 = t2;
 }
 
 int32_t Profile_GetValue(const struct Profile *profile, int32_t t)
 {
-    if (t > profile->t3)
+    if (t > profile->t2)
         return profile->vEnd;
-    else if (t > profile->t2) {
-        int32_t accel = profile->vEnd >= profile->vCoast ? profile->accel : -profile->accel;
-        int32_t value = (1000 * profile->vCoast + accel * (t - profile->t2)) / 100;
-
-        value += value > 0 ? 5 : -5;
-        value /= 10;
-        return value;
+    else if (t > profile->t1) {
+        int32_t v = (1000*profile->vEnd - profile->a2*(profile->t2 - t)) / 100;
+        v += v > 0 ? 5 : -5;
+        v /= 10;
+        return v;
     }
-    else if (t > profile->t1)
-        return profile->vCoast;
     else if (t > profile->t0) {
-        int32_t accel = profile->vCoast >= profile->vStart ? profile->accel : -profile->accel;
-        int32_t value = (1000 * profile->vStart + accel * (t - profile->t0)) / 100;
-
-        value += value > 0 ? 5 : -5;
-        value /= 10;
-        return value;
+        int32_t v = (1000*profile->vStart + profile->a1*(t - profile->t0)) / 100;
+        v += v > 0 ? 5 : -5;
+        v /= 10;
+        return v;
     }
     else
         return profile->vStart;
@@ -110,14 +154,14 @@ int32_t Profile_GetValue(const struct Profile *profile, int32_t t)
 
 ProfileState Profile_GetState(const struct Profile *profile, int32_t t)
 {
-    if (t > profile->t3)
+    if (t > profile->t2)
         return ProfileState_FINISHED;
-    else if (t > profile->t2)
-        return ProfileState_ACC2;
-    else if (t > profile->t1)
+    else if (t > profile->t1 && profile->a2 < 0)
+        return ProfileState_DECCEL;
+    else if (t > profile->t0 && profile->a1 > 0)
+        return ProfileState_ACCEL;
+    else if (t > profile->t1 || t > profile->t0)
         return ProfileState_COAST;
-    else if (t > profile->t0)
-        return ProfileState_ACC1;
     else
         return ProfileState_IDLE;
 }

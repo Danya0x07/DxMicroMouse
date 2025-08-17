@@ -3,16 +3,12 @@
 
 #include "module.h"
 
-typedef enum {
-    RouterRunType_SEARCH,
-    RouterRunType_RUSH
-} RouterRunType;
-
 void Router_Setup(void);
-void Router_RunToFinish(RouterRunType runType);
-void Router_RunToStart(void);
+void Router_TargetFinish(void);
+void Router_TargetStart(void);
+bool Router_RunSearch(void);
+bool Router_RunFast(void);
 void Router_EraseMaze(void);
-void Router_UpdateWalls(void);
 
 extern struct Module Router_module;
 

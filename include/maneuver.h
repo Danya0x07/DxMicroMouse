@@ -1,54 +1,51 @@
 #ifndef _INC_MANEUVER_H
 #define _INC_MANEUVER_H
 
-#include "router.h"
+#include "module.h"
 
 typedef enum {
     ManeuverStatus_COMPLETED,
     ManeuverStatus_FAILED
 } ManeuverStatus;
 
-#define MANEUVERKIND_SHIFT  4
-
-enum ManeuverKind {
-    ManeuverKind_BACKWARD       = 1 << (MANEUVERKIND_SHIFT + 0),
-    ManeuverKind_FORWARD        = 1 << (MANEUVERKIND_SHIFT + 1),
-    ManeuverKind_SMOOTHTURN     = 1 << (MANEUVERKIND_SHIFT + 2),
-    ManeuverKind_PIVOTTURN      = 1 << (MANEUVERKIND_SHIFT + 3),
-    ManeuverKind_STOP           = 1 << (MANEUVERKIND_SHIFT + 4)
-};
-
 enum Maneuver {
     Maneuver_NONE = 0,
+    Maneuver_BTR2M,
+    Maneuver_BTR2C,
+    Maneuver_HALFFWD,
+    Maneuver_FWD,
+    Maneuver_DFWD,
+    Maneuver_LS90,
+    Maneuver_RS90,
+    Maneuver_LS180,
+    Maneuver_RS180,
+    Maneuver_STOP,
+    Maneuver_SDL45,
+    Maneuver_SDR45,
+    Maneuver_FDL45,
+    Maneuver_FDR45,
+    Maneuver_SDL135,
+    Maneuver_SDR135,
+    Maneuver_FDL135,
+    Maneuver_FDR135,
+    Maneuver_D2DL,
+    Maneuver_D2DR,
 
-    Maneuver_BACKTRIM           = ManeuverKind_BACKWARD | 0,
-    Maneuver_BACKTRIM_RUSH      = ManeuverKind_BACKWARD | 1,
-
-    Maneuver_FORWARD            = ManeuverKind_FORWARD | 0,
-    Maneuver_FORWARD_SLOWDOWN   = ManeuverKind_FORWARD | 1,
-    Maneuver_FORWARD_SLOW       = ManeuverKind_FORWARD | 2,
-    Maneuver_FORWARD_SPEEDUP    = ManeuverKind_FORWARD | 3,
-
-    Maneuver_SMOOTHLEFT         = ManeuverKind_SMOOTHTURN | 0,
-    Maneuver_SMOOTHRIGHT        = ManeuverKind_SMOOTHTURN | 1,
-    Maneuver_SMOOTHLEFT_LONG    = ManeuverKind_SMOOTHTURN | 2,
-    Maneuver_SMOOTHRIGHT_LONG   = ManeuverKind_SMOOTHTURN | 3,
-
-    Maneuver_TURN_BACK          = ManeuverKind_PIVOTTURN | 0,
-
-    Maneuver_STOP               = ManeuverKind_STOP | 0,
-    Maneuver_STOP_RUSH          = ManeuverKind_STOP | 1
+    // Customizeable straight-shortcut maneuver
+    Maneuver_DASH
 };
 
-void Maneuver_PrepareToRun(RouterRunType runType);
-ManeuverStatus Maneuver_Perform(enum Maneuver maneuver);
-void Maneuver_SetDistanceError(int32_t distanceInMm);
-int32_t Maneuver_GetDistanceError(void);
+typedef enum ManeuverMode {
+    ManeuverMode_SEARCH,
+    ManeuverMode_FAST
+} ManeuverMode;
+
+void Maneuver_SetMode(ManeuverMode newMode);
+void Maneuver_SetupDash(int distance);
+void Maneuver_BindDisposableBacktrimCallback(void (*callback)(void));
+ManeuverStatus Maneuver_Perform(enum Maneuver maneuver, bool keepSpeed);
 void Maneuver_Abort(void);
 
-static inline bool Maneuver_OfKind(enum Maneuver maneuver, enum ManeuverKind kind)
-{
-    return !!(maneuver & kind);
-}
+extern struct Module Maneuver_module;
 
 #endif // _INC_MANEUVER_H

@@ -2,244 +2,305 @@
 #include "motion.h"
 #include "speedctl.h"
 #include "buzzer.h"
+#include "odometry.h"
+#include "utils.h"
 
-static int32_t distanceError;
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+/* ========== Compile-time params ========== */
+#define MAXIMUM_ALLOWED_CORRECTION  20
+#define DISTANCE_ERROR_THRESHOLD    3
+
+/* ========== Module variables ========== */
+static ManeuverMode maneuverMode = ManeuverMode_SEARCH;
 static bool needToAbort;
+static int distanceError;
+static struct Motion MOTION_Dash[2];
+static int distanceToDash;
+static void (*disposableBacktrimCallback)(void);
 
-static void ApplyCorrection(void)
-{
-    Motion_SetCorrection((struct MotionCorrection){distanceError});
-    distanceError = 0;
-}
-
-static void ResetCorrection(void)
-{
-    Motion_SetCorrection((struct MotionCorrection){0});
-    distanceError = 0;
-}
-
-static void _DoNothing(uint32_t idx)
-{
-    (void)idx;  // (-_-)
-}
-
-static void _CheckCompletionStatus(ManeuverStatus status)
-{
-    if (status != ManeuverStatus_COMPLETED) {
-        SpeedCtl_SetState(DISABLE);
-        Buzzer_Blink(6, 800, 80);
-    }
-}
-
-static void _Backtrim_OnNextMotion(uint32_t idx)
-{
-    if (idx == 0) {
-        SpeedCtl_Reset();
-        SpeedCtl_SetMode(SpeedCtlMode_BACKTRIM);
-    }
-    else if (idx == 1) {
-        Router_UpdateWalls();
-        //SpeedCtl_Reset();
-        SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
-    }
-}
-
-static void _CorrectDistance(uint32_t idx)
-{
-    Buzzer_BeepAsync(4000, 20);
-    ApplyCorrection();
-}
-
-static void _SmoothTurn_OnNextMotion(uint32_t idx)
-{
-    if (idx == 0) {
-        Buzzer_BeepAsync(4000, 20);
-        ApplyCorrection();
-    }
-    else if (idx == 1) {
-        SpeedCtl_SetMode(SpeedCtlMode_TURN);
-    }
-    else if (idx == 2) {
-        SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
-    }
-}
-
-static void _SmoothTurn_OnComplete(ManeuverStatus status)
-{
-    _CheckCompletionStatus(status);
-}
-
-static void _SmoothTurnLong_OnNextMotion(uint32_t idx)
-{
-    ResetCorrection();
-    SpeedCtl_SetMode(SpeedCtlMode_TURN);
-}
-
-static void _SmoothTurnLong_OnComplete(ManeuverStatus status)
-{
-    _CheckCompletionStatus(status);
-    SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
-}
-
-static void _TurnBack_OnNextMotion(uint32_t idx)
-{
-    if (idx == 0) {
-        ApplyCorrection();
-    }
-    else if (idx == 1) {
-        SpeedCtl_SetMode(SpeedCtlMode_TURN);
-        Buzzer_BeepAsync(1500, 30);
-    }
-    else if (idx == 2) {
-        SpeedCtl_SetMode(SpeedCtlMode_BACKTRIM);
-    }
-    else if (idx == 3) {
-        SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
-    }
-}
-
-static void _Stop_OnNextMotion(uint32_t idx)
-{
-    if (idx == 0) {
-        Buzzer_BeepAsync(2600, 30);
-        ApplyCorrection();
-    }
-    else if (idx == 1) {
-        //SpeedCtl_Reset();
-        SpeedCtl_SetMode(SpeedCtlMode_TURN);
-    }
-}
-
-static void _Stop_OnComplete(ManeuverStatus status)
-{
-    SpeedCtl_Reset();
-    _CheckCompletionStatus(status);
-}
-
-static const struct ManeuverCtlBlock {
-    const enum Motion *motions;
-    uint32_t numMotions;
-    void (*onNextMotion)(uint32_t idx);
-    void (*loop)(uint32_t idx);
-    void (*onComplete)(ManeuverStatus status);
-} maneuvers[] = {
-    [Maneuver_NONE] = {
-        .numMotions = 0
+/* ========== NVM configuration ========== */
+static struct ManeuverConfig {
+    struct MotionConfig motionConfig;
+    int32_t vTransTurn;
+    int32_t vTransDash;
+    int32_t vRot;
+} configs[2] = {
+    [ManeuverMode_SEARCH] = {
+        .motionConfig = {
+            .aTrans = 4000,
+            .aRot = 5000
+        },
+        .vTransTurn = 360,
+        .vTransDash = 400,
+        .vRot = 720
     },
-    [Maneuver_BACKTRIM] = {
-        .motions = (const enum Motion []){Motion_PARK_BACK2WALL, Motion_PARK_FWD2DP},
-        .numMotions = 2,
-        .onNextMotion = _Backtrim_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_BACKTRIM_RUSH] = {
-        .motions = (const enum Motion []){Motion_PARK_BACK2WALL, Motion_PARK_FWD2DP_ACC2SLOW},
-        .numMotions = 2,
-        .onNextMotion = _Backtrim_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_FORWARD] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2DP},
-        .numMotions = 1,
-        .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_FORWARD_SLOWDOWN] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2DP_DECC},
-        .numMotions = 1,
-        .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_FORWARD_SLOW] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2DP_SLOW},
-        .numMotions = 1,
-        .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_FORWARD_SPEEDUP] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2DP_ACC},
-        .numMotions = 1,
-        .onNextMotion = _CorrectDistance,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_SMOOTHLEFT] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2T, Motion_SMOOTH_LEFT90, Motion_FWD_T2DP},
-        .numMotions = 3,
-        .onNextMotion = _SmoothTurn_OnNextMotion,
-        .loop = _DoNothing, // TODO: Implement crash detection
-        .onComplete = _SmoothTurn_OnComplete
-    },
-    [Maneuver_SMOOTHRIGHT] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2T, Motion_SMOOTH_RIGHT90, Motion_FWD_T2DP},
-        .numMotions = 3,
-        .onNextMotion = _SmoothTurn_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _SmoothTurn_OnComplete
-    },
-    [Maneuver_SMOOTHLEFT_LONG] = {
-        .motions = (const enum Motion []){Motion_SMOOTH_LEFT90_LONG},
-        .numMotions = 1,
-        .onNextMotion = _SmoothTurnLong_OnNextMotion,
-        .loop = _DoNothing, // TODO: Implement crash detection
-        .onComplete = _SmoothTurnLong_OnComplete
-    },
-    [Maneuver_SMOOTHRIGHT_LONG] = {
-        .motions = (const enum Motion []){Motion_SMOOTH_RIGHT90_LONG},
-        .numMotions = 1,
-        .onNextMotion = _SmoothTurnLong_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _SmoothTurnLong_OnComplete
-    },
-    [Maneuver_TURN_BACK] = {
-        .motions = (const enum Motion []) {
-                Motion_FWD_DP2C, Motion_PIVOT_LEFT180, Motion_PARK_BACK2WALL, Motion_PARK_FWD2DP},
-        .numMotions = 4,
-        .onNextMotion = _TurnBack_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _CheckCompletionStatus
-    },
-    [Maneuver_STOP] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2C, Motion_PIVOT_RIGHT180},
-        .numMotions = 2,
-        .onNextMotion = _Stop_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _Stop_OnComplete
-    },
-    [Maneuver_STOP_RUSH] = {
-        .motions = (const enum Motion []){Motion_FWD_DP2C_FROMSLOW, Motion_PIVOT_RIGHT180},
-        .numMotions = 2,
-        .onNextMotion = _Stop_OnNextMotion,
-        .loop = _DoNothing,
-        .onComplete = _Stop_OnComplete
+    [ManeuverMode_FAST] = {
+        .motionConfig = {
+            .aTrans = 4000,
+            .aRot = 8000
+        },
+        .vTransTurn = 600,
+        .vTransDash = 1000,
+        .vRot = 1080
     }
 };
 
-void Maneuver_PrepareToRun(RouterRunType runType)
+/* ========== Maneuver control structures =========== */
+typedef struct { int vTrans, vRot; } Speeds;
+
+struct ManeuverCtlBlock {
+    const struct Motion **motions;
+    unsigned numMotions;
+    Speeds (*onNextMotion)(unsigned idx, struct Motion *m, bool keepSpeed);
+    void (*loop)(unsigned idx);
+    void (*onComplete)(ManeuverStatus status);
+};
+
+/* ========== Generic callbacks ========== */
+static void _Generic_Loop(unsigned idx);
+static void _Generic_OnComplete(ManeuverStatus status);
+
+/* ========== Maneuver-specific OnNextMotion callbacks ========== */
+static Speeds _BTR_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _FWD_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _TS90_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _TS180_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _STOP_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+//~ static Speeds _SD_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _FD45_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _FD135_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _D2D_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+
+#define _SD_OnNextMotion    _TS90_OnNextMotion
+
+/* ========== Maneuver-specific loop callbacks ========== */
+#define _BTR_Loop   _Generic_Loop
+#define _FWD_Loop   _Generic_Loop
+#define _TS90_Loop  _Generic_Loop
+#define _TS180_Loop _Generic_Loop
+#define _STOP_Loop  _Generic_Loop
+#define _SD_Loop    _Generic_Loop
+#define _FD_Loop    _Generic_Loop
+#define _D2D_Loop   _Generic_Loop
+#define _DASH_Loop  _Generic_Loop
+
+/* ========== Maneuver-specific OnComplete callbacks ========== */
+//~ static void _BTR_OnComplete(ManeuverStatus status);
+static void _FWD_OnComplete(ManeuverStatus status);
+static void _HALFFWD_OnComplete(ManeuverStatus status);
+static void _DFWD_OnComplete(ManeuverStatus status);
+//~ static void _TS90_OnComplete(ManeuverStatus status);
+static void _TS180_OnComplete(ManeuverStatus status);
+//~ static void _STOP_OnComplete(ManeuverStatus status);
+static void _SD_OnComplete(ManeuverStatus status);
+//~ static void _FD_OnComplete(ManeuverStatus status);
+//~ static void _D2D_OnComplete(ManeuverStatus status);
+//~ static void _DASH_OnComplete(ManeuverStatus status);
+
+#define _BTR_OnComplete     _Generic_OnComplete
+#define _TS90_OnComplete    _Generic_OnComplete
+#define _STOP_OnComplete    _Generic_OnComplete
+#define _FD_OnComplete      _Generic_OnComplete
+#define _D2D_OnComplete     _Generic_OnComplete
+#define _DASH_OnComplete    _Generic_OnComplete
+
+/* ========== Maneuvers definitions ========== */
+static const struct ManeuverCtlBlock maneuvers[] = {
+    [Maneuver_NONE] = {
+        .numMotions = 0
+    },
+    [Maneuver_BTR2M] = {
+        .motions = (const struct Motion *[]) {
+            &MOTION_BACK_PARK_1, &MOTION_BACK_PARK_2,
+            &MOTION_FWD_UNPARK2C, &MOTION_FWD_UNPARK2C},
+        .numMotions = 4,
+        .onNextMotion = _BTR_OnNextMotion,
+        .loop = _BTR_Loop,
+        .onComplete = _BTR_OnComplete
+    },
+    [Maneuver_BTR2C] = {
+        .motions = (const struct Motion *[]){&MOTION_BACK_PARK_1, &MOTION_BACK_PARK_2, &MOTION_FWD_UNPARK2C},
+        .numMotions = 3,
+        .onNextMotion = _BTR_OnNextMotion,
+        .loop = _BTR_Loop,
+        .onComplete = _BTR_OnComplete
+    },
+    [Maneuver_HALFFWD] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_M2C},
+        .numMotions = 1,
+        .onNextMotion = _FWD_OnNextMotion,
+        .loop = _FWD_Loop,
+        .onComplete = _HALFFWD_OnComplete
+    },
+    [Maneuver_FWD] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_M2M},
+        .numMotions = 1,
+        .onNextMotion = _FWD_OnNextMotion,
+        .loop = _FWD_Loop,
+        .onComplete = _FWD_OnComplete
+    },
+    [Maneuver_DFWD] = {
+        .motions = (const struct Motion *[]){&MOTION_DFWD},
+        .numMotions = 1,
+        .onNextMotion = _FWD_OnNextMotion,
+        .loop = _FWD_Loop,
+        .onComplete = _DFWD_OnComplete
+    },
+    [Maneuver_LS90] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_M2T90, &MOTION_LS90_1, &MOTION_LS90_2, &MOTION_FWD_M2T90},
+        .numMotions = 4,
+        .onNextMotion = _TS90_OnNextMotion,
+        .loop = _TS90_Loop,
+        .onComplete = _TS90_OnComplete
+    },
+    [Maneuver_RS90] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_M2T90, &MOTION_RS90_1, &MOTION_RS90_2, &MOTION_FWD_M2T90},
+        .numMotions = 4,
+        .onNextMotion = _TS90_OnNextMotion,
+        .loop = _TS90_Loop,
+        .onComplete = _TS90_OnComplete
+    },
+    [Maneuver_LS180] = {
+        .motions = (const struct Motion *[]){&MOTION_LS180_1, &MOTION_LS180_2},
+        .numMotions = 2,
+        .onNextMotion = _TS180_OnNextMotion,
+        .loop = _TS180_Loop,
+        .onComplete = _TS180_OnComplete
+    },
+    [Maneuver_RS180] = {
+        .motions = (const struct Motion *[]){&MOTION_RS180_1, &MOTION_RS180_2},
+        .numMotions = 2,
+        .onNextMotion = _TS180_OnNextMotion,
+        .loop = _TS180_Loop,
+        .onComplete = _TS180_OnComplete
+    },
+    [Maneuver_STOP] = {
+        .motions = (const struct Motion *[]){&MOTION_RP180_1, &MOTION_RP180_2},
+        .numMotions = 2,
+        .onNextMotion = _STOP_OnNextMotion,
+        .loop = _STOP_Loop,
+        .onComplete = _STOP_OnComplete
+    },
+    [Maneuver_SDL45] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_C245, &MOTION_LS45_1, &MOTION_LS45_2},
+        .numMotions = 3,
+        .onNextMotion = _SD_OnNextMotion,
+        .loop = _SD_Loop,
+        .onComplete = _SD_OnComplete
+    },
+    [Maneuver_SDR45] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_C245, &MOTION_RS45_1, &MOTION_RS45_2},
+        .numMotions = 3,
+        .onNextMotion = _SD_OnNextMotion,
+        .loop = _SD_Loop,
+        .onComplete = _SD_OnComplete
+    },
+    [Maneuver_FDL45] = {
+        .motions = (const struct Motion *[]){&MOTION_LS45_1, &MOTION_LS45_2, &MOTION_FWD_C245},
+        .numMotions = 3,
+        .onNextMotion = _FD45_OnNextMotion,
+        .loop = _FD_Loop,
+        .onComplete = _FD_OnComplete
+    },
+    [Maneuver_FDR45] = {
+        .motions = (const struct Motion *[]){&MOTION_RS45_1, &MOTION_RS45_2, &MOTION_FWD_C245},
+        .numMotions = 3,
+        .onNextMotion = _FD45_OnNextMotion,
+        .loop = _FD_Loop,
+        .onComplete = _FD_OnComplete
+    },
+    [Maneuver_SDL135] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_C2135, &MOTION_LS135_1, &MOTION_LS135_2},
+        .numMotions = 3,
+        .onNextMotion = _SD_OnNextMotion,
+        .loop = _SD_Loop,
+        .onComplete = _SD_OnComplete
+    },
+    [Maneuver_SDR135] = {
+        .motions = (const struct Motion *[]){&MOTION_FWD_C2135, &MOTION_RS135_1, &MOTION_RS135_2},
+        .numMotions = 3,
+        .onNextMotion = _SD_OnNextMotion,
+        .loop = _SD_Loop,
+        .onComplete = _SD_OnComplete
+    },
+    [Maneuver_FDL135] = {
+        .motions = (const struct Motion *[]){&MOTION_LS135_1, &MOTION_LS135_2, &MOTION_FWD_C2135},
+        .numMotions = 3,
+        .onNextMotion = _FD135_OnNextMotion,
+        .loop = _FD_Loop,
+        .onComplete = _FD_OnComplete
+    },
+    [Maneuver_FDR135] = {
+        .motions = (const struct Motion *[]){&MOTION_RS135_1, &MOTION_RS135_2, &MOTION_FWD_C2135},
+        .numMotions = 3,
+        .onNextMotion = _FD135_OnNextMotion,
+        .loop = _FD_Loop,
+        .onComplete = _FD_OnComplete
+    },
+    [Maneuver_D2DL] = {
+        .motions = (const struct Motion *[]) {
+            &MOTION_DFWD_D2D, &MOTION_LS90_D2D_1, &MOTION_LS90_D2D_2, &MOTION_DFWD_D2D
+        },
+        .numMotions = 4,
+        .onNextMotion = _D2D_OnNextMotion,
+        .loop = _D2D_Loop,
+        .onComplete = _D2D_OnComplete
+    },
+    [Maneuver_D2DR] = {
+        .motions = (const struct Motion *[]) {
+            &MOTION_DFWD_D2D, &MOTION_RS90_D2D_1, &MOTION_RS90_D2D_2, &MOTION_DFWD_D2D
+        },
+        .numMotions = 4,
+        .onNextMotion = _D2D_OnNextMotion,
+        .loop = _D2D_Loop,
+        .onComplete = _D2D_OnComplete
+    },
+    [Maneuver_DASH] = {
+        .motions = (const struct Motion *[]){&MOTION_Dash[0], &MOTION_Dash[1]},
+        .numMotions = 2,
+        .onNextMotion = _DASH_OnNextMotion,
+        .loop = _DASH_Loop,
+        .onComplete = _DASH_OnComplete
+    }
+};
+
+/* ========== Public functions ========== */
+
+void Maneuver_SetMode(ManeuverMode mode)
 {
+    maneuverMode = mode;
     distanceError = 0;
     needToAbort = false;
 
-    Motion_SetMode(runType == RouterRunType_RUSH ? MotionMode_FAST : MotionMode_SLOW);
+    Motion_Configure(&configs[maneuverMode].motionConfig);
 }
 
-ManeuverStatus Maneuver_Perform(enum Maneuver maneuver)
+void Maneuver_SetupDash(int distance)
+{
+    distanceToDash += distance;
+}
+
+void Maneuver_BindDisposableBacktrimCallback(void (*callback)(void))
+{
+    disposableBacktrimCallback = callback;
+}
+
+ManeuverStatus Maneuver_Perform(enum Maneuver maneuver, bool keepSpeed)
 {
     ManeuverStatus status = ManeuverStatus_COMPLETED;
-    const struct ManeuverCtlBlock *m = &maneuvers[maneuver];
-    enum Motion motion;
+    const struct ManeuverCtlBlock *mcb = &maneuvers[maneuver];
 
-    for (uint32_t motionIdx = 0; motionIdx < m->numMotions; motionIdx++) {
-        motion = m->motions[motionIdx];
-        m->onNextMotion(motionIdx);
-        Motion_Start(motion);
+    for (unsigned motionIdx = 0; motionIdx < mcb->numMotions; motionIdx++) {
+        struct Motion motion = *mcb->motions[motionIdx];
+        Speeds endSpeeds = mcb->onNextMotion(motionIdx, &motion, keepSpeed);
+
+        Motion_Start(&motion, endSpeeds.vTrans, endSpeeds.vRot);
         while (Motion_IsOngoing()) {
-            m->loop(motionIdx);
+            mcb->loop(motionIdx);
 
             if (needToAbort) {
                 status = ManeuverStatus_FAILED;
@@ -250,21 +311,319 @@ ManeuverStatus Maneuver_Perform(enum Maneuver maneuver)
     }
 
 abort:
-    m->onComplete(status);
+    mcb->onComplete(status);
     return status;
-}
-
-void Maneuver_SetDistanceError(int32_t distanceInMm)
-{
-    distanceError = distanceInMm;
-}
-
-int32_t Maneuver_GetDistanceError(void)
-{
-    return distanceError;
 }
 
 void Maneuver_Abort(void)
 {
     needToAbort = true;
 }
+
+/* ========== Utility functions ========== */
+
+static void UpdateDistanceError(int predictionDelta)
+{
+    int predictedDistance, predictedAngle, distance, angle;
+
+    Odometry_UpdatePrediction(predictionDelta, 0);
+    Odometry_GetPrediction(&predictedDistance, &predictedAngle);
+    Odometry_GetFusion(&distance, &angle);
+
+    int error = predictedDistance - distance;
+    if (error >= DISTANCE_ERROR_THRESHOLD || error <= -DISTANCE_ERROR_THRESHOLD) {
+        distanceError += error;
+    }
+}
+
+static void ApplyDistanceCorrection(struct Motion *m)
+{
+    int correction = distanceError;
+    int substractableDistance = min(m->distanceInMm, MAXIMUM_ALLOWED_CORRECTION);
+
+    if (m->distanceInMm > 0 && correction < -substractableDistance) {
+        correction = -substractableDistance;
+    }
+    else if (m->distanceInMm < 0 && correction > substractableDistance) {
+        correction = substractableDistance;
+    }
+    m->distanceInMm += correction;
+    distanceError -= 0;
+}
+
+static void ResetDistanceError(void)
+{
+    Odometry_Reset();
+    distanceError = 0;
+}
+
+static Speeds ChooseDefaultSpeeds(bool keepTrans, bool keepRot)
+{
+    return (Speeds) {keepTrans ? configs[maneuverMode].vTransTurn : 0, keepRot ? configs[maneuverMode].vRot : 0};
+}
+
+static void CheckStatus(ManeuverStatus status)
+{
+    if (status == ManeuverStatus_COMPLETED) {
+        Buzzer_BeepAsync(4000, 20);
+    }
+    else {
+        SpeedCtl_SetState(DISABLE);
+        Buzzer_Blink(6, 800, 80);
+    }
+}
+
+static Speeds CalcSpeedsForExitingDiagonal(unsigned idx, int distance0, int distance1, bool keepSpeed)
+{
+    int vTrans1 = SquareRootRounded(2 * configs[maneuverMode].motionConfig.aTrans * distance1);
+    vTrans1 = min(vTrans1, configs[maneuverMode].vTransTurn);
+
+    int vTrans0 = SquareRootRounded(
+            2 * configs[maneuverMode].motionConfig.aTrans * distance0 + vTrans1 * vTrans1);
+    vTrans0 = min(vTrans0, configs[maneuverMode].vTransTurn);
+
+    switch (idx) {
+        case 0:
+            SpeedCtl_SetMode(SpeedCtlMode_TURN);
+            return keepSpeed ? ChooseDefaultSpeeds(1, 1) : (Speeds) {vTrans0, configs[maneuverMode].vRot};
+        case 1:
+            return keepSpeed ? ChooseDefaultSpeeds(1, 0) : (Speeds) {vTrans1, 0};
+        case 2:
+        default:
+            SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+            return ChooseDefaultSpeeds(keepSpeed, 0);
+    }
+}
+
+/* ========== General callbacks ========== */
+
+static void _Generic_Loop(unsigned idx)
+{
+    (void)idx;  // (-_-)
+}
+
+static void _Generic_OnComplete(ManeuverStatus status)
+{
+    CheckStatus(status);
+    ResetDistanceError();
+}
+
+/* ========== Maneuver-specific OnNextMotion callbacks ========== */
+
+static Speeds _BTR_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    switch (idx) {
+        case 0:
+            SpeedCtl_Reset();
+            SpeedCtl_SetMode(SpeedCtlMode_BACKTRIM);
+            return (Speeds) {200, 0};
+        case 1:
+            return ChooseDefaultSpeeds(0, 0);
+        case 2:
+            if (disposableBacktrimCallback) {
+                disposableBacktrimCallback();
+                disposableBacktrimCallback = NULL;
+            }
+            SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+            return ChooseDefaultSpeeds(1, 0);
+        case 3:
+        default:
+            return ChooseDefaultSpeeds(keepSpeed, 0);
+    }
+}
+
+static Speeds _FWD_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    ApplyDistanceCorrection(m);
+    return ChooseDefaultSpeeds(keepSpeed, 0);
+}
+
+static Speeds _TS90_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    switch (idx) {
+        case 0:
+            //~ ApplyDistanceCorrection(m);
+            return ChooseDefaultSpeeds(1, 0);
+        case 1:
+            SpeedCtl_SetMode(SpeedCtlMode_TURN);
+            return ChooseDefaultSpeeds(1, 1);
+        case 2:
+            return ChooseDefaultSpeeds(1, 0);
+        case 3:
+        default:
+            SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+            return ChooseDefaultSpeeds(keepSpeed, 0);
+    }
+}
+
+static Speeds _TS180_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    switch (idx) {
+        case 0:
+            SpeedCtl_SetMode(SpeedCtlMode_TURN);
+            return ChooseDefaultSpeeds(1, 1);
+        case 1:
+        default:
+            return ChooseDefaultSpeeds(keepSpeed, 0);
+    }
+}
+
+static Speeds _STOP_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    switch (idx) {
+        case 0:
+            Buzzer_BeepAsync(2600, 30);
+            SpeedCtl_SetMode(SpeedCtlMode_TURN);
+            return ChooseDefaultSpeeds(0, 1);
+        case 1:
+        default:
+            return ChooseDefaultSpeeds(0, 0);
+    }
+}
+
+static Speeds _FD45_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    return CalcSpeedsForExitingDiagonal(idx, MOTION_LS45_2.distanceInMm, MOTION_FWD_C245.distanceInMm, keepSpeed);
+}
+
+static Speeds _FD135_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    return CalcSpeedsForExitingDiagonal(idx, MOTION_LS135_2.distanceInMm, MOTION_FWD_C2135.distanceInMm, keepSpeed);
+}
+
+static Speeds _D2D_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    switch (idx) {
+        case 0:
+            return ChooseDefaultSpeeds(1, 0);
+        case 1:
+            SpeedCtl_SetMode(SpeedCtlMode_TURN);
+            return ChooseDefaultSpeeds(1, 1);
+        case 2:
+            return ChooseDefaultSpeeds(1, 0);
+        case 3:
+        default:
+            SpeedCtl_SetMode(SpeedCtlMode_DIAGONAL);
+            return ChooseDefaultSpeeds(keepSpeed, 0);
+    }
+}
+
+static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+{
+    int vTrans = configs[maneuverMode].vTransDash; // TODO: choose max speed based on distance
+
+    switch (idx) {
+        case 0:
+            m->distanceInMm = distanceToDash / 2;
+            break;
+        case 1:
+        default:
+            vTrans = configs[maneuverMode].vTransTurn * keepSpeed;
+            m->distanceInMm = distanceToDash;
+    }
+    distanceToDash -= m->distanceInMm;
+    return (Speeds) {vTrans, 0};
+}
+
+/* ========== Maneuver-specific OnComplete callbacks ========== */
+
+static void _FWD_OnComplete(ManeuverStatus status)
+{
+    CheckStatus(status);
+    UpdateDistanceError(MOTION_FWD_M2M.distanceInMm);
+}
+
+static void _HALFFWD_OnComplete(ManeuverStatus status)
+{
+    CheckStatus(status);
+    UpdateDistanceError(MOTION_FWD_M2C.distanceInMm);
+}
+
+static void _DFWD_OnComplete(ManeuverStatus status)
+{
+    CheckStatus(status);
+    UpdateDistanceError(MOTION_DFWD.distanceInMm);
+}
+
+static void _TS180_OnComplete(ManeuverStatus status)
+{
+    _Generic_OnComplete(status);
+    SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+}
+
+static void _SD_OnComplete(ManeuverStatus status)
+{
+    _Generic_OnComplete(status);
+    SpeedCtl_SetMode(SpeedCtlMode_DIAGONAL);
+}
+
+/* ========== Module service things ========== */
+
+static int execute(int argc, char *argv[])
+{
+    if (argc < 1)
+        return -1;
+
+    struct ManeuverConfig *config = &configs[maneuverMode];
+
+    if (!strcmp(argv[0], "cfg") && argc == 5) {
+        config->vTransTurn = atoi(argv[1]);
+        config->vTransDash = atoi(argv[2]);
+        config->vRot = atoi(argv[3]);
+        config->motionConfig.aTrans = atoi(argv[4]);
+        config->motionConfig.aRot = atoi(argv[5]);
+    }
+    else if (!strcmp(argv[0], "mode") && argc == 2) {
+        ManeuverMode newMode = (ManeuverMode)(atoi(argv[1]) & 1);
+        Maneuver_SetMode(newMode);
+    }
+    else if (!strcmp(argv[0], "mt") && argc == 3) {
+        int distanceInMm = atoi(argv[1]);
+        int angleInDeg = atoi(argv[2]);
+
+        struct Motion motionPart1 = {distanceInMm / 2, angleInDeg / 2};
+        struct Motion motionPart2 = {distanceInMm - motionPart1.distanceInMm, angleInDeg - motionPart1.angleInDeg};
+
+        Motion_Start(&motionPart1, config->vTransTurn, config->vRot);
+        while (Motion_IsOngoing());
+        Motion_Start(&motionPart2, 0, 0);
+        while (Motion_IsOngoing());
+    }
+    else if (!strcmp(argv[0], "mn") && argc == 2) {
+        enum Maneuver maneuver = (enum Maneuver)atoi(argv[1]);
+        Maneuver_Perform(maneuver, 0);
+    }
+    else if (!strcmp(argv[0], "ps")) {
+        printf("Motion config:\n"
+               "V1: %ld\tV2: %ld\tW: %ld\n"
+               "At: %ld\tAr: %ld\n",
+               config->vTransTurn, config->vTransDash, config->vRot,
+               config->motionConfig.aTrans, config->motionConfig.aRot);
+    }
+    else
+        return -2;
+
+    return 0;
+}
+
+static void load(const uint8_t *buffer)
+{
+    memcpy(configs, buffer, sizeof(configs));
+}
+
+static void save(uint8_t *buffer)
+{
+    memcpy(buffer, configs, sizeof(configs));
+}
+
+static struct ModuleSettings settings = {
+    .dataSize = sizeof(configs),
+    .load = load,
+    .save = save
+};
+
+struct Module Maneuver_module = {
+    .name = "mnv",
+    .execute = execute,
+    .settings = &settings
+};

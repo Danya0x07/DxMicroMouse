@@ -15,6 +15,7 @@
 #include "speedctl.h"
 #include "odometry.h"
 #include "motion.h"
+#include "maneuver.h"
 #include "router.h"
 
 struct Module *modules[] = {
@@ -28,12 +29,12 @@ struct Module *modules[] = {
     &SpeedCtl_module,
     &Odometry_module,
     &Buzzer_module,
-    &Motion_module,
+    &Maneuver_module,
     &Router_module,
     NULL
 };
 
-static RouterRunType runType = RouterRunType_SEARCH;
+static bool runFast = false;
 
 static void InitModules(void)
 {
@@ -106,16 +107,16 @@ static void WaitForFinger(void)
     printf("Waiting for your finger... ;)\n");
     Buzzer_Blink(1, 1200, 50);
 
-    runType = RouterRunType_SEARCH;
+    runFast = false;
     LED0_ON();
     while (!Sensors_DetectFinger()) {
         if (Button_GetEvent() == ButtonEvent_PRESS) {
-            if (runType == RouterRunType_SEARCH) {
-                runType = RouterRunType_RUSH;
+            if (runFast == false) {
+                runFast = true;
                 LED1_ON();
             }
             else {
-                runType = RouterRunType_SEARCH;
+                runFast = false;
                 LED1_OFF();
             }
         }
@@ -160,7 +161,6 @@ int main(void)
     if (setupMode) {
         Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 50);
         printf("Setup mode\n");
-        Motion_SetDiscreteMotion(ENABLE);
 
         if (GetPress()) {
             Router_EraseMaze();
@@ -188,10 +188,17 @@ int main(void)
 
         for (;;) {
             WaitForFinger();
-            Router_RunToFinish(runType);
+            Router_TargetFinish();
+            if (runFast) {
+                Router_RunFast();
+            }
+            else {
+                Router_RunSearch();
+            }
             ShowHappiness();
             Modules_SaveSettings();  // to save known maze
-            Router_RunToStart();
+            Router_TargetStart();
+            Router_RunSearch();
             Modules_SaveSettings();  // to save known maze
             CheckBattery();
         }

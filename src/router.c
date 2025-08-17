@@ -1,6 +1,5 @@
 #include "router.h"
 #include "maneuver.h"
-#include "odometry.h"
 #include "floodfill.h"
 #include "sensors.h"
 #include "fan.h"
@@ -9,9 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define CELL_LENGTH 180
-#define CORR_NEED_THRESH    3
 
 typedef enum {
     RouterState_IDLE,
@@ -22,9 +18,6 @@ typedef enum {
 } RouterState;
 
 static RouterState state = RouterState_IDLE;
-static enum Maneuver lastManeuver = Maneuver_NONE;
-static RouterRunType runType = RouterRunType_SEARCH;
-
 static struct MazeCell cell = {0, 0};
 static unsigned direction = MAZE_UP;
 
@@ -42,10 +35,10 @@ static struct {
 };
 
 static const enum Maneuver MANEUVERS[4] = {
-    [MAZE_UP] = Maneuver_FORWARD,
-    [MAZE_LEFT] = Maneuver_SMOOTHLEFT,
-    [MAZE_DOWN] = Maneuver_TURN_BACK,
-    [MAZE_RIGHT] = Maneuver_SMOOTHRIGHT
+    [MAZE_UP] = Maneuver_FWD,
+    [MAZE_LEFT] = Maneuver_LS90,
+    [MAZE_DOWN] = Maneuver_HALFFWD,
+    [MAZE_RIGHT] = Maneuver_RS90
 };
 
 static int PrintMazeMeta(struct MazeCell c, uint_fast8_t row, char meta[6])
@@ -63,61 +56,41 @@ static int PrintMazeMeta(struct MazeCell c, uint_fast8_t row, char meta[6])
     return 0;
 }
 
+static void UpdateWalls(void)
+{
+    struct SensorsWalls walls;
+    Sensors_ReadWalls(&walls);
+
+    if (walls.front) {
+        Maze_AddWallRelative(cell, direction, MAZE_UP);
+        Floodfill_RecomputeFromCell(cell);
+    }
+    if (walls.left) {
+        Maze_AddWallRelative(cell, direction, MAZE_LEFT);
+        Floodfill_RecomputeFromCell(cell);
+    }
+    if (walls.right) {
+        Maze_AddWallRelative(cell, direction, MAZE_RIGHT);
+        Floodfill_RecomputeFromCell(cell);
+    }
+}
+
 /* На старте нас ставят в центр ячейки. Мы должны сдать назад на такое расстояние (лучше с запасом),
  * чтобы жопой гарантированно упереться и отперпендикуляриться о заднюю стенку ячейки.
  * Затем двинуться вперёд, выйти на крейсерскую скорость и в районе граничной линии перейти в состояние RUNNING.
  * Далее выполняем штатное движение по лабиринту. */
 static void OnStart(void)
 {
-    enum Maneuver maneuver = runType == RouterRunType_RUSH ? Maneuver_BACKTRIM_RUSH : Maneuver_BACKTRIM;
-    ManeuverStatus maneuverStatus = Maneuver_Perform(maneuver); // Стены проверяются когда упёрлись в зад
+    Maneuver_BindDisposableBacktrimCallback(UpdateWalls);
+    ManeuverStatus maneuverStatus = Maneuver_Perform(Maneuver_BTR2M, 1); // Стены проверяются когда упёрлись в зад
 
     if (maneuverStatus != ManeuverStatus_COMPLETED) {
         state = RouterState_FAILED;
         return;
     }
 
-    Odometry_Reset();
     cell = Maze_GetNeighbor(cell, direction);
-    state = RouterState_RUNNING;
-}
-
-static enum Maneuver AdjustManeuverForRush(const struct MazeCell *nextCell,
-                                           unsigned nextCellDirection,
-                                           enum Maneuver maneuver)
-{
-    struct MazeCell nextNextCell = Floodfill_NextCell(*nextCell);
-    unsigned nextNextCellDirection = Maze_GetDirection(*nextCell, nextNextCell);
-    unsigned nextNextMoveDirection = Maze_GetRelativeDirection(nextCellDirection, nextNextCellDirection);
-    enum Maneuver nextManeuver = MANEUVERS[nextNextMoveDirection];
-
-    if (maneuver == Maneuver_FORWARD) {
-        if (nextManeuver == Maneuver_FORWARD && Floodfill_GetDistance(*nextCell) != 0) {
-            if (lastManeuver == Maneuver_FORWARD || lastManeuver == Maneuver_FORWARD_SPEEDUP) {
-                return Maneuver_FORWARD;
-            }
-            else {
-                return Maneuver_FORWARD_SPEEDUP;
-            }
-        }
-        else {
-            if (lastManeuver == Maneuver_FORWARD || lastManeuver == Maneuver_FORWARD_SPEEDUP) {
-                return Maneuver_FORWARD_SLOWDOWN;
-            }
-            else {
-                return Maneuver_FORWARD_SLOW;
-            }
-        }
-    }
-    else if (maneuver == Maneuver_SMOOTHLEFT) {
-        return Maneuver_SMOOTHLEFT_LONG;
-    }
-    else if (maneuver == Maneuver_SMOOTHRIGHT) {
-        return Maneuver_SMOOTHRIGHT_LONG;
-    }
-    else {  // Невозможно на скоростном заезде
-        return Maneuver_STOP_RUSH;
-    }
+    state = Floodfill_GetDistance(cell) == 0 ? RouterState_FINISHING : RouterState_RUNNING;
 }
 
 /* Штатное движение по лабиринту. Происходит между точками принятия решений.
@@ -135,43 +108,28 @@ static enum Maneuver AdjustManeuverForRush(const struct MazeCell *nextCell,
  * Если ячейка, в которую сейчас смотрим, есть целевая ячейка, то переходим в состояние FINISHING */
 static void OnDecisionPoint(void)
 {
-    Router_UpdateWalls();
-
-    if (!Maneuver_OfKind(lastManeuver, ManeuverKind_FORWARD)) {
-        Odometry_Reset();
-    }
+    UpdateWalls();
 
     struct MazeCell nextCell = Floodfill_NextCell(cell);
     unsigned nextCellDirection = Maze_GetDirection(cell, nextCell); // с какой стороны сл. ячейка от текущей
     unsigned nextMoveDirection = Maze_GetRelativeDirection(direction, nextCellDirection);
     enum Maneuver maneuver = MANEUVERS[nextMoveDirection];
 
-    if (runType == RouterRunType_RUSH) {
-        maneuver = AdjustManeuverForRush(&nextCell, nextCellDirection, maneuver);
+    bool turningBack = maneuver == Maneuver_HALFFWD;
+    ManeuverStatus maneuverStatus = Maneuver_Perform(maneuver, !turningBack);
+
+    if (turningBack) {
+        maneuverStatus |= Maneuver_Perform(Maneuver_STOP, 0);
+        maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
     }
 
-    // Выполнить манёвр
-    ManeuverStatus maneuverStatus = Maneuver_Perform(maneuver);
     if (maneuverStatus != ManeuverStatus_COMPLETED) {
         state = RouterState_FAILED;
         return;
     }
 
-    if (Maneuver_OfKind(maneuver, ManeuverKind_FORWARD)) {  // NOTE: мб ещё _STOP подходит
-        int32_t predictedDistance, predictedAngle, distance, angle;
-
-        Odometry_UpdatePrediction(CELL_LENGTH, 0);
-        Odometry_GetPrediction(&predictedDistance, &predictedAngle);
-        Odometry_GetFusion(&distance, &angle);
-
-        int32_t distanceError = predictedDistance - distance;
-        if (distanceError >= CORR_NEED_THRESH || distanceError <= -CORR_NEED_THRESH)
-            Maneuver_SetDistanceError(distanceError);
-    }
-
     cell = nextCell;
     direction = nextCellDirection;
-    lastManeuver = maneuver;
 
     if (Floodfill_GetDistance(cell) == 0) {
         state = RouterState_FINISHING;
@@ -184,22 +142,21 @@ static void OnDecisionPoint(void)
 static void OnTargetReached(void)
 {
     ManeuverStatus maneuverStatus;
-    enum Maneuver stopManeuver = runType == RouterRunType_RUSH ? Maneuver_STOP_RUSH : Maneuver_STOP;
-
-    Router_UpdateWalls();
+    UpdateWalls();
 
     if (!Maze_CellHasWallOnSide(cell, direction, MAZE_UP)) {
-        enum Maneuver forwardManeuver = runType == RouterRunType_RUSH ? Maneuver_FORWARD_SLOW : Maneuver_FORWARD;
-
-        if ((maneuverStatus = Maneuver_Perform(forwardManeuver)) != ManeuverStatus_COMPLETED) {
+        if ((maneuverStatus = Maneuver_Perform(Maneuver_FWD, 1)) != ManeuverStatus_COMPLETED) {
             state = RouterState_FAILED;
             return;
         }
         cell = Maze_GetNeighbor(cell, direction);
-        Router_UpdateWalls();
+        UpdateWalls();
     }
 
-    if ((maneuverStatus = Maneuver_Perform(stopManeuver)) != ManeuverStatus_COMPLETED) {
+    maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
+    maneuverStatus |= Maneuver_Perform(Maneuver_STOP, 0);
+
+    if (maneuverStatus != ManeuverStatus_COMPLETED) {
         state = RouterState_FAILED;
         return;
     }
@@ -240,83 +197,56 @@ void Router_Setup(void)
 
     cell = params.startCell;
     direction = params.startDirection;
-    runType = RouterRunType_SEARCH;
 }
 
-static void RunToTarget(void)
+void Router_TargetFinish(void)
+{
+    Floodfill_Setup(params.goalCell, params.extendGoal);
+}
+
+void Router_TargetStart(void)
+{
+    Floodfill_Setup(params.startCell, false);
+}
+
+bool Router_RunSearch(void)
 {
     state = RouterState_STARTING;
+    Maneuver_SetMode(ManeuverMode_SEARCH);
     printf("Starting from cell %d,%d dir %d\n", cell.x, cell.y, direction);
 
     do {
         Spin();
-        //Maze_Print(PrintMazeMeta);
+
         if (state == RouterState_FAILED) {
             Fan_Off();
-            for (;;) {}
+            return false;
         }
     } while (state != RouterState_IDLE);
+
     printf("Reached cell %d,%d dir %d\n", cell.x, cell.y, direction);
+    Maze_Print(PrintMazeMeta);
+    return true;
 }
 
-void Router_RunToFinish(RouterRunType nextRunType)
+bool Router_RunFast(void)
 {
-    if (state != RouterState_IDLE) {
-        return;
-    }
-
-    runType = nextRunType;
-    Maneuver_PrepareToRun(runType);
-    Floodfill_Setup(params.goalCell, params.extendGoal);
-
-    if (runType == RouterRunType_RUSH) {
-        Fan_On();
-        Millis_Wait(1000);
-    }
-    RunToTarget();
+    state = RouterState_RUNNING;
+    Maneuver_SetMode(ManeuverMode_FAST);
+    // Calc route
+    Fan_On();
+    Millis_Wait(1000);
+    // Run
     Fan_Off();
     Maze_Print(PrintMazeMeta);
-}
+    state = RouterState_IDLE;
 
-void Router_RunToStart(void)
-{
-    if (state != RouterState_IDLE) {
-        return;
-    }
-
-    runType = RouterRunType_SEARCH;
-    Maneuver_PrepareToRun(runType);
-    Floodfill_Setup(params.startCell, false);
-    RunToTarget();
-    Maze_Print(PrintMazeMeta);
+    return false;
 }
 
 void Router_EraseMaze(void)
 {
     Maze_Init(params.mazeN, params.mazeM);
-}
-
-void Router_UpdateWalls(void)
-{
-    if (runType != RouterRunType_SEARCH) {
-        return;
-    }
-
-    struct SensorsWalls walls;
-    Sensors_ReadWalls(&walls);
-
-    if (walls.front) {
-        Maze_AddWallRelative(cell, direction, MAZE_UP);
-        Floodfill_RecomputeFromCell(cell);
-    }
-    if (walls.left) {
-        Maze_AddWallRelative(cell, direction, MAZE_LEFT);
-        Floodfill_RecomputeFromCell(cell);
-    }
-    if (walls.right) {
-        Maze_AddWallRelative(cell, direction, MAZE_RIGHT);
-        Floodfill_RecomputeFromCell(cell);
-    }
 }
 
 static int execute(int argc, char *argv[])
@@ -379,13 +309,13 @@ static int execute(int argc, char *argv[])
     else if (!strcmp(argv[0], "n")) {
         if (state == RouterState_IDLE) {
             if (cell.x == params.startCell.x && cell.y == params.startCell.y) {
-                Maneuver_PrepareToRun(RouterRunType_SEARCH);
+                Maneuver_SetMode(ManeuverMode_SEARCH);
                 Floodfill_Setup(params.goalCell, params.extendGoal);
                 state = RouterState_STARTING;
                 Spin();
             }
             else if (cell.x == params.goalCell.x && cell.y == params.goalCell.y) {
-                Maneuver_PrepareToRun(RouterRunType_SEARCH);
+                Maneuver_SetMode(ManeuverMode_SEARCH);
                 Floodfill_Setup(params.startCell, false);
                 state = RouterState_STARTING;
                 Spin();
