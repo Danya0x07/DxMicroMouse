@@ -15,6 +15,8 @@ enum Maneuver {
     Maneuver_HALFFWD,
     Maneuver_FWD,
     Maneuver_DFWD,
+    Maneuver_LP90,
+    Maneuver_RP90,
     Maneuver_LS90,
     Maneuver_RS90,
     Maneuver_LS180,

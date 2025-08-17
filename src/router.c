@@ -9,6 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_CONSECUTIVE_TURNS   2
+
 typedef enum {
     RouterState_IDLE,
     RouterState_STARTING,
@@ -20,6 +22,7 @@ typedef enum {
 static RouterState state = RouterState_IDLE;
 static struct MazeCell cell = {0, 0};
 static unsigned direction = MAZE_UP;
+static unsigned consecutiveTurns = 0;
 
 static struct {
     unsigned mazeN, mazeM;
@@ -114,13 +117,29 @@ static void OnDecisionPoint(void)
     unsigned nextCellDirection = Maze_GetDirection(cell, nextCell); // с какой стороны сл. ячейка от текущей
     unsigned nextMoveDirection = Maze_GetRelativeDirection(direction, nextCellDirection);
     enum Maneuver maneuver = MANEUVERS[nextMoveDirection];
+    ManeuverStatus maneuverStatus;
 
-    bool turningBack = maneuver == Maneuver_HALFFWD;
-    ManeuverStatus maneuverStatus = Maneuver_Perform(maneuver, !turningBack);
-
-    if (turningBack) {
+    if (maneuver == Maneuver_LS90 || maneuver == Maneuver_RS90) {
+        consecutiveTurns++;
+        if (consecutiveTurns > MAX_CONSECUTIVE_TURNS) {
+            maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
+            maneuverStatus |= Maneuver_Perform(maneuver == Maneuver_LS90 ? Maneuver_LP90 : Maneuver_RP90, 0);
+            maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
+            consecutiveTurns = 0;
+        }
+        else {
+            maneuverStatus = Maneuver_Perform(maneuver, 1);
+        }
+    }
+    else if (maneuver == Maneuver_HALFFWD) {
+        consecutiveTurns = 0;
+        maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
         maneuverStatus |= Maneuver_Perform(Maneuver_STOP, 0);
         maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
+    }
+    else {
+        consecutiveTurns = 0;
+        maneuverStatus = Maneuver_Perform(maneuver, 1);
     }
 
     if (maneuverStatus != ManeuverStatus_COMPLETED) {
@@ -220,6 +239,7 @@ bool Router_RunSearch(void)
 
         if (state == RouterState_FAILED) {
             Fan_Off();
+            Maze_Print(PrintMazeMeta);
             return false;
         }
     } while (state != RouterState_IDLE);

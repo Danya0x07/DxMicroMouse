@@ -30,8 +30,8 @@ static struct ManeuverConfig {
 } configs[2] = {
     [ManeuverMode_SEARCH] = {
         .motionConfig = {
-            .aTrans = 4000,
-            .aRot = 5000
+            .aTrans = 3000,
+            .aRot = 6000
         },
         .vTransTurn = 360,
         .vTransDash = 400,
@@ -66,6 +66,7 @@ static void _Generic_OnComplete(ManeuverStatus status);
 /* ========== Maneuver-specific OnNextMotion callbacks ========== */
 static Speeds _BTR_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _FWD_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+//~ static Speeds _TP90_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _TS90_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _TS180_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _STOP_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
@@ -75,11 +76,13 @@ static Speeds _FD135_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed
 static Speeds _D2D_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 
+#define _TP90_OnNextMotion  _STOP_OnNextMotion
 #define _SD_OnNextMotion    _TS90_OnNextMotion
 
 /* ========== Maneuver-specific loop callbacks ========== */
 #define _BTR_Loop   _Generic_Loop
 #define _FWD_Loop   _Generic_Loop
+#define _TP90_Loop  _Generic_Loop
 #define _TS90_Loop  _Generic_Loop
 #define _TS180_Loop _Generic_Loop
 #define _STOP_Loop  _Generic_Loop
@@ -102,6 +105,7 @@ static void _SD_OnComplete(ManeuverStatus status);
 //~ static void _DASH_OnComplete(ManeuverStatus status);
 
 #define _BTR_OnComplete     _Generic_OnComplete
+#define _TP90_OnComplete    _Generic_OnComplete
 #define _TS90_OnComplete    _Generic_OnComplete
 #define _STOP_OnComplete    _Generic_OnComplete
 #define _FD_OnComplete      _Generic_OnComplete
@@ -149,6 +153,20 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .onNextMotion = _FWD_OnNextMotion,
         .loop = _FWD_Loop,
         .onComplete = _DFWD_OnComplete
+    },
+    [Maneuver_LP90] = {
+        .motions = (const struct Motion *[]){&MOTION_LP90_1, &MOTION_LP90_2},
+        .numMotions = 2,
+        .onNextMotion = _TP90_OnNextMotion,
+        .loop = _TP90_Loop,
+        .onComplete = _TP90_OnComplete
+    },
+    [Maneuver_RP90] = {
+        .motions = (const struct Motion *[]){&MOTION_RP90_1, &MOTION_RP90_2},
+        .numMotions = 2,
+        .onNextMotion = _TP90_OnNextMotion,
+        .loop = _TP90_Loop,
+        .onComplete = _TP90_OnComplete
     },
     [Maneuver_LS90] = {
         .motions = (const struct Motion *[]){&MOTION_FWD_M2T90, &MOTION_LS90_1, &MOTION_LS90_2, &MOTION_FWD_M2T90},
@@ -339,13 +357,20 @@ static void UpdateDistanceError(int predictionDelta)
 static void ApplyDistanceCorrection(struct Motion *m)
 {
     int correction = distanceError;
+    int addableDistance = MAXIMUM_ALLOWED_CORRECTION;
     int substractableDistance = min(m->distanceInMm, MAXIMUM_ALLOWED_CORRECTION);
 
-    if (m->distanceInMm > 0 && correction < -substractableDistance) {
-        correction = -substractableDistance;
+    if (m->distanceInMm > 0) {
+        if (correction > addableDistance)
+            correction = addableDistance;
+        else if (correction < -substractableDistance)
+            correction = -substractableDistance;
     }
-    else if (m->distanceInMm < 0 && correction > substractableDistance) {
-        correction = substractableDistance;
+    else if (m->distanceInMm < 0) {
+        if (correction < -addableDistance)
+            correction = -addableDistance;
+        else if (correction > substractableDistance)
+            correction = substractableDistance;
     }
     m->distanceInMm += correction;
     distanceError -= 0;
@@ -566,7 +591,7 @@ static int execute(int argc, char *argv[])
 
     struct ManeuverConfig *config = &configs[maneuverMode];
 
-    if (!strcmp(argv[0], "cfg") && argc == 5) {
+    if (!strcmp(argv[0], "cfg") && argc == 6) {
         config->vTransTurn = atoi(argv[1]);
         config->vTransDash = atoi(argv[2]);
         config->vRot = atoi(argv[3]);

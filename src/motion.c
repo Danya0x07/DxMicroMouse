@@ -22,12 +22,8 @@ const struct Motion
         .distanceInMm = SECONDHALF(-(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 7)),
         .angleInDeg = 0
     },
-    MOTION_FWD_UNPARK2M = {
-        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + CELLHALF),
-        .angleInDeg = 0
-    },
     MOTION_FWD_UNPARK2C = {
-        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2),
+        .distanceInMm = +(CELLHALF - MOUSEBACKLEN - WALLTHICKNESS/2 + 10),
         .angleInDeg = 0
     },
     MOTION_FWD_M2M = {
@@ -35,7 +31,7 @@ const struct Motion
         .angleInDeg = 0
     },
     MOTION_FWD_M2T90 = {
-        .distanceInMm = 20,
+        .distanceInMm = 25,
         .angleInDeg = 0
     },
     MOTION_FWD_M2C = {
@@ -43,19 +39,19 @@ const struct Motion
         .angleInDeg = 0
     },
     MOTION_LS90_1 = {
-        .distanceInMm = FIRSTHALF(110),
+        .distanceInMm = FIRSTHALF(102),
         .angleInDeg = FIRSTHALF(90)
     },
     MOTION_LS90_2 = {
-        .distanceInMm = SECONDHALF(110),
+        .distanceInMm = SECONDHALF(102),
         .angleInDeg = SECONDHALF(90)
     },
     MOTION_RS90_1 = {
-        .distanceInMm = FIRSTHALF(110),
+        .distanceInMm = FIRSTHALF(102),
         .angleInDeg = FIRSTHALF(-90)
     },
     MOTION_RS90_2 = {
-        .distanceInMm = SECONDHALF(110),
+        .distanceInMm = SECONDHALF(102),
         .angleInDeg = SECONDHALF(-90)
     },
     MOTION_LP90_1 = {
