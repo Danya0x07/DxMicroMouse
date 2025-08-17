@@ -239,7 +239,6 @@ bool Router_RunSearch(void)
 
         if (state == RouterState_FAILED) {
             Fan_Off();
-            Maze_Print(PrintMazeMeta);
             return false;
         }
     } while (state != RouterState_IDLE);
