@@ -3,7 +3,6 @@
 #include "leds.h"
 #include "button.h"
 #include "buzzer.h"
-#include <m95256.h>
 #include "motors.h"
 #include "fan.h"
 #include "sensors.h"
@@ -40,14 +39,13 @@ static void InitModules(void)
 {
     int retcode;
 
-    if ((retcode = Memory_Init()) != 0) {
-        printf("Memory retcode: %d\n", retcode);
-        Buzzer_BlinkInitError(1);
+    if (!Button_IsPressed()) {
+        if ((retcode = Modules_LoadSettings()) < 0)
+            Buzzer_BlinkInitError(1);
     }
-    if (!Button_IsPressed())
-        Modules_LoadSettings();
-    else
+    else {
         printf("Skip loading settings\n");
+    }
 
     if ((retcode = Encoders_Init()) != 0) {
         printf("Encoders retcode: %d\n", retcode);

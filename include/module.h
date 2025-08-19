@@ -31,8 +31,8 @@ struct Module {
 extern struct Module *modules[]; // Should be declared in main.c and end with NULL.
 
 void Modules_SendTelemetry(void);
-void Modules_LoadSettings(void);
-void Modules_SaveSettings(void);
+int Modules_LoadSettings(void);
+int Modules_SaveSettings(void);
 struct Module *Module_FindByName(const char *name);
 void Modules_Print(void);
 

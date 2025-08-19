@@ -4,7 +4,7 @@
 
 #include <string.h>
 
-#define MEMORY_BUFFER_SIZE  1000
+#define MEMORY_BUFFER_SIZE  MEMORY_MAX_BUFFER_SIZE
 
 #define FOR_EACH_MODULE(addr)  for (struct Module **addr = &modules[0]; *(addr); addr++)
 
@@ -30,7 +30,7 @@ void Modules_SendTelemetry(void)
     }
 }
 
-void Modules_LoadSettings(void)
+int Modules_LoadSettings(void)
 {
     struct ModuleSettings *settings;
     uint8_t *ptr = memoryBuffer;
@@ -38,9 +38,9 @@ void Modules_LoadSettings(void)
     SysTick_DisableInterrupt();
     if (Memory_LoadBuffer(memoryBuffer, MEMORY_BUFFER_SIZE) < 0) {
         UART_SendString("Failed to load settings\n");
-        return;
+        SysTick_EnableInterrupt();
+        return -1;
     }
-    SysTick_EnableInterrupt();
 
     FOR_EACH_MODULE(m) {
         settings = (*m)->settings;
@@ -51,9 +51,12 @@ void Modules_LoadSettings(void)
         }
     }
     printf("Settings loaded\n");
+
+    SysTick_EnableInterrupt();
+    return 0;
 }
 
-void Modules_SaveSettings(void)
+int Modules_SaveSettings(void)
 {
     struct ModuleSettings *settings;
     uint8_t *ptr = memoryBuffer;
@@ -71,11 +74,14 @@ void Modules_SaveSettings(void)
     SysTick_DisableInterrupt();
     if (Memory_SaveBuffer(memoryBuffer, MEMORY_BUFFER_SIZE) < 0) {
         printf("Failed to save settings\n");
+        SysTick_EnableInterrupt();
+        return -1;
     }
     else {
         printf("Settings saved\n");
     }
     SysTick_EnableInterrupt();
+    return 0;
 }
 
 struct Module *Module_FindByName(const char *name)
