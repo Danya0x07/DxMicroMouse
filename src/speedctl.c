@@ -12,24 +12,20 @@
 static FunctionalState state = DISABLE;
 static SpeedCtlMode mode = SpeedCtlMode_STRAIGHT;
 
-static int32_t targetVTransInUmPerS, targetVRotInLsbs;
-static int32_t vTransInUmPerS, vRotInLsbs;
+static int32_t targetVTransInTpS, targetVTransInt, vTransInTpS, vTransInt;
+static int32_t targetVRotInLsbs, targetVRotInt, vRotInLsbs, vRotInt;
 
 static struct Regulator vTransRegulator, vRotRegulator;
 
 static struct {
     int32_t vTransKp, vTransKi, vTransKd;
     int32_t vRotKp, vRotKi, vRotKd;
-    int32_t coeffAccel;
-    int32_t coeffGyro;
     int32_t coeffSensors;
     int32_t minOutputThreshold;
     int32_t motorFeedForward;
 } params = {
-    .vTransKp = 10000, .vTransKi = 200, .vTransKd = 0,
-    .vRotKp = 100000, .vRotKi = 15000, .vRotKd = 0,
-    .coeffAccel = 200,
-    .coeffGyro = 1000,
+    .vTransKp = 1, .vTransKi = 0, .vTransKd = 40,
+    .vRotKp = 5, .vRotKi = 0, .vRotKd = 20,
     .coeffSensors = 10,
     .minOutputThreshold = 0,
     .motorFeedForward = 0
@@ -42,8 +38,8 @@ static enum TelemetryMode {
 
 void SpeedCtl_Reset(void)
 {
-    vTransInUmPerS = 0;
-    vRotInLsbs = 0;
+    vTransInTpS = vRotInLsbs = 0;
+    vTransInt = vRotInt = targetVTransInt = targetVRotInt = 0;
     Regulator_Reset(&vTransRegulator);
     Regulator_Reset(&vRotRegulator);
     Encoders_Reset();
@@ -72,13 +68,13 @@ void SpeedCtl_Setup(void)
 
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS)
 {
-    targetVTransInUmPerS = vTransInMmPerS * 1000;
+    targetVTransInTpS = vTransInMmPerS * COUNTS_PER_CELL / 180;
     targetVRotInLsbs = (vRotInDegPerS << 15) / 2000;
 }
 
 void SpeedCtl_GetSpeed(int32_t *vTransInMmPerS, int32_t *vRotInDegPerS)
 {
-    *vTransInMmPerS = vTransInUmPerS / 1000;
+    *vTransInMmPerS = vTransInTpS * 180 / COUNTS_PER_CELL;
     *vRotInDegPerS = vRotInLsbs * 2000 / 32768;
 }
 
@@ -110,26 +106,16 @@ void SpeedCtl_Update(void)
     Encoders_GetDelta(&deltaCounts);
     IMU_GetData(&imuData);
 
-    int32_t transInCounts = deltaCounts.left + deltaCounts.right;
+    int32_t transInCounts = (deltaCounts.left + deltaCounts.right) / 2;
     int32_t rotInCounts = deltaCounts.right - deltaCounts.left;
-
-    if (transInCounts > 0)
-        transInCounts++;
-    else if (transInCounts < 0)
-        transInCounts--;
-    transInCounts /= 2;
 
     // IMU LSBs = ImuUnits/S = mImuUnits/ms
 
     // mImuUnits/ms ~ m/(s^2) = (m/s)/s = (mm/s)/ms
-    vTransInUmPerS =
-            ((int64_t)vTransInUmPerS * params.coeffAccel - (int64_t)imuData.accelX * 9800 * params.coeffAccel / 8192
-            + (1000 - params.coeffAccel) * (int64_t)transInCounts * 1000000 / COUNTS_PER_MM) / 100;
-    vTransInUmPerS += vTransInUmPerS > 0 ? 5 : -5;
-    vTransInUmPerS /= 10;
+    vTransInTpS = transInCounts * 1000;
 
-    // Override coeffGyro for backward trim movement
-    int32_t coeffGyro = mode == SpeedCtlMode_BACKTRIM ? 100 : params.coeffGyro;
+    // Override gyro for backward trim movement
+    int32_t coeffGyro = mode == SpeedCtlMode_BACKTRIM ? 100 : 1000;
 
     vRotInLsbs = (coeffGyro * imuData.gyroZ
             + (1000 - coeffGyro) * rotInCounts * 256) / 100;
@@ -139,23 +125,23 @@ void SpeedCtl_Update(void)
     // mImuUnits/ms ~ Deg/S = mDeg/ms
     Odometry_UpdateReckon(transInCounts, vRotInLsbs);
 
-    if (mode == SpeedCtlMode_STRAIGHT && targetVTransInUmPerS > 0) {
+    if (mode == SpeedCtlMode_STRAIGHT && targetVTransInTpS > 0) {
         vRotInLsbs += params.coeffSensors * Sensors_GetSteeringError();
         if (Sensors_DetectTransition()) {
             Odometry_SnapReckon();
         }
     }
 
-    int64_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInUmPerS, vTransInUmPerS);
-    int64_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInLsbs, vRotInLsbs);
+    targetVTransInt += targetVTransInTpS;
+    vTransInt += vTransInTpS;
+    targetVRotInt += targetVRotInLsbs;
+    vRotInt += vRotInLsbs;
 
-    int32_t leftOutput = (transOutput - rotOutput) / 100000;
-    leftOutput += leftOutput > 0 ? 5 : -5;
-    leftOutput /= 10;
+    int32_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInt, vTransInt) * MOTOR_PWM_MAX / 1000000;
+    int32_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInt, vRotInt) * MOTOR_PWM_MAX / 1000000;
 
-    int32_t rightOutput = (transOutput + rotOutput) / 100000;
-    rightOutput += rightOutput > 0 ? 5 : -5;
-    rightOutput /= 10;
+    int32_t leftOutput = transOutput - rotOutput;
+    int32_t rightOutput = transOutput + rotOutput;
 
     leftOutput = AdjustRegOutput(leftOutput);
     rightOutput = AdjustRegOutput(rightOutput);
@@ -216,16 +202,6 @@ static int execute(int argc, char *argv[])
         FunctionalState newState = (FunctionalState)!!atoi(argv[1]);
         SpeedCtl_SetState(newState);
     }
-    else if (!strcmp(argv[0], "acc")) {
-        if (argc != 2)
-            return -1;
-        params.coeffAccel = atoi(argv[1]);
-    }
-    else if (!strcmp(argv[0], "gyr")) {
-        if (argc != 2)
-            return -1;
-        params.coeffGyro = atoi(argv[1]);
-    }
     else if (!strcmp(argv[0], "sens")) {
         if (argc != 2)
             return -1;
@@ -237,12 +213,10 @@ static int execute(int argc, char *argv[])
         printf("SpeedCtl settings:\n"
                "vTrans: %ld %ld %ld\n"
                "vRot: %ld %ld %ld\n"
-               "cA: %ld\tcG: %ld\tcS: %ld\n"
-               "minThresh: %ld\tmFF: %ld\n",
+               "minThresh: %ld\tmFF: %ld\tcS: %ld\n",
                params.vTransKp, params.vTransKi, params.vTransKd,
                params.vRotKp, params.vRotKi, params.vRotKd,
-               params.coeffAccel, params.coeffGyro, params.coeffSensors,
-               params.minOutputThreshold, params.motorFeedForward);
+               params.minOutputThreshold, params.motorFeedForward, params.coeffSensors);
     }
     else if (!strcmp(argv[0], "rst"))
         SpeedCtl_Reset();
@@ -258,8 +232,8 @@ static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
     if (telemetryMode == TelemetryMode_VTRANS) {
         snprintf(out, TELEMETRY_STRING_SIZE,
             "tgtV: %ld\tv: %ld\n",
-            targetVTransInUmPerS,
-            vTransInUmPerS
+            targetVTransInTpS,
+            vTransInTpS
         );
     }
     else {

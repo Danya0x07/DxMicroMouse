@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define COUNTS_PER_CELL 11116
 #define COUNTS_TO_TRANSITION    6198
 
 static struct Odometry {

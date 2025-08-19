@@ -4,6 +4,7 @@
 #include "module.h"
 
 #define COUNTS_PER_MM    63
+#define COUNTS_PER_CELL 11116
 
 void Odometry_Reset(void);
 
