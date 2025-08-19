@@ -218,6 +218,11 @@ void Router_Setup(void)
     direction = params.startDirection;
 }
 
+void Router_ChangeStartDirection(void)
+{
+    direction = MAZE_RIGHT;
+}
+
 void Router_TargetFinish(void)
 {
     Floodfill_Setup(params.goalCell, params.extendGoal);

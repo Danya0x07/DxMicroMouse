@@ -4,6 +4,7 @@
 #include "module.h"
 
 void Router_Setup(void);
+void Router_ChangeStartDirection(void);
 void Router_TargetFinish(void);
 void Router_TargetStart(void);
 bool Router_RunSearch(void);

@@ -80,20 +80,21 @@ static void CheckBattery(void)
     }
 }
 
-static bool GetPress(void)
+static bool GetPress(unsigned blinkFreq)
 {
     bool press = false;
     while (Button_IsPressed()) {}
 
-    for (int i = 0; i < 10; i++) {
+    uint32_t t = Millis_Get();
+    while (Millis_Get() - t < 3000) {
         LED1_OFF();
-        Millis_Wait(100);
+        Millis_Wait(1000 / blinkFreq);
         if (Button_GetEvent() == ButtonEvent_PRESS) {
             press = true;
             break;
         }
         LED1_ON();
-        Millis_Wait(100);
+        Millis_Wait(1000 / blinkFreq);
     }
     LED1_OFF();
     Millis_Wait(200);
@@ -156,13 +157,13 @@ int main(void)
     Millis_Wait(1000);
     CheckBattery();
 
-    bool setupMode = GetPress();
+    bool setupMode = GetPress(5);
 
     if (setupMode) {
         Buzzer_SingSetupMode();
         printf("Setup mode\n");
 
-        if (GetPress()) {
+        if (GetPress(10)) {
             Router_EraseMaze();
             Modules_SaveSettings();
             printf("Maze erased from RAM\n");
@@ -182,6 +183,10 @@ int main(void)
     else {
         Buzzer_SingRunMode();
         printf("Run mode\n");
+        if (GetPress(10)) {
+            Router_ChangeStartDirection();
+            Millis_Wait(2000);
+        }
         SpeedCtl_Reset();
         SpeedCtl_SetState(ENABLE);
         Sensors_SetLightening(ENABLE);
