@@ -21,7 +21,7 @@ enum Maneuver {
     Maneuver_RS90,
     Maneuver_LS180,
     Maneuver_RS180,
-    Maneuver_STOP,
+    Maneuver_TBACK,
     Maneuver_SDL45,
     Maneuver_SDR45,
     Maneuver_FDL45,

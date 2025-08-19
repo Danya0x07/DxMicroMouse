@@ -42,7 +42,7 @@ static void InitModules(void)
 
     if ((retcode = Memory_Init()) != 0) {
         printf("Memory retcode: %d\n", retcode);
-        Buzzer_Blink(1, 1000, 300);
+        Buzzer_BlinkInitError(1);
     }
     if (!Button_IsPressed())
         Modules_LoadSettings();
@@ -51,13 +51,13 @@ static void InitModules(void)
 
     if ((retcode = Encoders_Init()) != 0) {
         printf("Encoders retcode: %d\n", retcode);
-        Buzzer_Blink(2, 1000, 300);
+        Buzzer_BlinkInitError(2);
     }
     Encoders_Reset();
 
     if ((retcode = IMU_Init(ImuConfiguration_APP)) != 0) {
         printf("IMU retcode: %d\n", retcode);
-        Buzzer_Blink(3, 1000, 300);
+        Buzzer_BlinkInitError(3);
     }
 
     SPI_SetSpeedToNormal();
@@ -76,7 +76,7 @@ static void CheckBattery(void)
     printf("Battery status: %s\n", Battery_StatusToStr(batteryStatus));
     if (batteryStatus <= BatteryStatus_LOW) {
         printf("WARNING: low power!\n");
-        Buzzer_Blink(3, 600, 80);
+        Buzzer_BlinkLowBattery();
     }
 }
 
@@ -105,7 +105,7 @@ static void WaitForFinger(void)
     while (Sensors_DetectFinger()) {}
 
     printf("Waiting for your finger... ;)\n");
-    Buzzer_Blink(1, 1200, 50);
+    Buzzer_BlinkWaitingFinger(1);
 
     runFast = false;
     LED0_ON();
@@ -123,12 +123,12 @@ static void WaitForFinger(void)
         Millis_Wait(200);
     }
     LED0_OFF();
-    Buzzer_Blink(1, 2000, 50);
+    Buzzer_BlinkWaitingFinger(2);
 
     printf("Now remove\n");
     while (Sensors_DetectFinger()) {}
     Millis_Wait(300);
-    Buzzer_Blink(1, 3000, 50);
+    Buzzer_BlinkWaitingFinger(3);
 }
 
 static void ShowHappiness(void)
@@ -137,7 +137,7 @@ static void ShowHappiness(void)
     LED0_ON();
     Millis_Wait(100);
     LED1_ON();
-    Buzzer_Sing((uint16_t []){2600, 2900, 3100, 3300, 3600, 3900}, 6, 70);
+    Buzzer_SingHappy();
     LED1_OFF();
     Millis_Wait(100);
     LED0_OFF();
@@ -159,14 +159,14 @@ int main(void)
     bool setupMode = GetPress();
 
     if (setupMode) {
-        Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 50);
+        Buzzer_SingSetupMode();
         printf("Setup mode\n");
 
         if (GetPress()) {
             Router_EraseMaze();
             Modules_SaveSettings();
             printf("Maze erased from RAM\n");
-            Buzzer_Sing((uint16_t []){2000, 1800}, 2, 50);
+            Buzzer_SingErazeMaze();
         }
 
         for (;;) {
@@ -175,12 +175,12 @@ int main(void)
                 SpeedCtl_SetState(DISABLE);
                 Sensors_SetLightening(DISABLE);
                 Fan_Off();
-                Buzzer_Blink(2, 900, 80);
+                Buzzer_BlinkStopActivity();
             }
         }
     }
     else {
-        Buzzer_Sing((uint16_t []){2800, 2800, 3300, 4000}, 4, 50);
+        Buzzer_SingRunMode();
         printf("Run mode\n");
         SpeedCtl_Reset();
         SpeedCtl_SetState(ENABLE);
@@ -223,13 +223,3 @@ void SysTick_Handler(void)
     Motion_Update();
     SpeedCtl_Update();
 }
-
-//~ __attribute__((interrupt()))
-//~ void EXTI1_IRQHandler(void)
-//~ {
-    //~ if(EXTI_GetITStatus(EXTI_Line1) != RESET) {
-        //~ SpeedCtl_SetState(DISABLE);
-        //~ Motors_SetPwm(0, 0);
-        //~ EXTI_ClearITPendingBit(EXTI_Line1);
-    //~ }
-//~ }

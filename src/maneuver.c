@@ -69,14 +69,14 @@ static Speeds _FWD_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 //~ static Speeds _TP90_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _TS90_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _TS180_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
-static Speeds _STOP_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
+static Speeds _TBACK_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 //~ static Speeds _SD_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _FD45_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _FD135_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _D2D_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed);
 
-#define _TP90_OnNextMotion  _STOP_OnNextMotion
+#define _TP90_OnNextMotion  _TBACK_OnNextMotion
 #define _SD_OnNextMotion    _TS90_OnNextMotion
 
 /* ========== Maneuver-specific loop callbacks ========== */
@@ -85,7 +85,7 @@ static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
 #define _TP90_Loop  _Generic_Loop
 #define _TS90_Loop  _Generic_Loop
 #define _TS180_Loop _Generic_Loop
-#define _STOP_Loop  _Generic_Loop
+#define _TBACK_Loop  _Generic_Loop
 #define _SD_Loop    _Generic_Loop
 #define _FD_Loop    _Generic_Loop
 #define _D2D_Loop   _Generic_Loop
@@ -98,7 +98,7 @@ static void _HALFFWD_OnComplete(ManeuverStatus status);
 static void _DFWD_OnComplete(ManeuverStatus status);
 //~ static void _TS90_OnComplete(ManeuverStatus status);
 static void _TS180_OnComplete(ManeuverStatus status);
-//~ static void _STOP_OnComplete(ManeuverStatus status);
+static void _TBACK_OnComplete(ManeuverStatus status);
 static void _SD_OnComplete(ManeuverStatus status);
 //~ static void _FD_OnComplete(ManeuverStatus status);
 //~ static void _D2D_OnComplete(ManeuverStatus status);
@@ -107,7 +107,6 @@ static void _SD_OnComplete(ManeuverStatus status);
 #define _BTR_OnComplete     _Generic_OnComplete
 #define _TP90_OnComplete    _Generic_OnComplete
 #define _TS90_OnComplete    _Generic_OnComplete
-#define _STOP_OnComplete    _Generic_OnComplete
 #define _FD_OnComplete      _Generic_OnComplete
 #define _D2D_OnComplete     _Generic_OnComplete
 #define _DASH_OnComplete    _Generic_OnComplete
@@ -196,12 +195,12 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .loop = _TS180_Loop,
         .onComplete = _TS180_OnComplete
     },
-    [Maneuver_STOP] = {
+    [Maneuver_TBACK] = {
         .motions = (const struct Motion *[]){&MOTION_RP180_1, &MOTION_RP180_2},
         .numMotions = 2,
-        .onNextMotion = _STOP_OnNextMotion,
-        .loop = _STOP_Loop,
-        .onComplete = _STOP_OnComplete
+        .onNextMotion = _TBACK_OnNextMotion,
+        .loop = _TBACK_Loop,
+        .onComplete = _TBACK_OnComplete
     },
     [Maneuver_SDL45] = {
         .motions = (const struct Motion *[]){&MOTION_FWD_C245, &MOTION_LS45_1, &MOTION_LS45_2},
@@ -390,11 +389,11 @@ static Speeds ChooseDefaultSpeeds(bool keepTrans, bool keepRot)
 static void CheckStatus(ManeuverStatus status)
 {
     if (status == ManeuverStatus_COMPLETED) {
-        Buzzer_BeepAsync(4000, 20);
+        Buzzer_BeepManeuverCompleted();
     }
     else {
         SpeedCtl_SetState(DISABLE);
-        Buzzer_Blink(6, 800, 80);
+        Buzzer_BlinkManeuverFailed();
     }
 }
 
@@ -496,11 +495,10 @@ static Speeds _TS180_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed
     }
 }
 
-static Speeds _STOP_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
+static Speeds _TBACK_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
 {
     switch (idx) {
         case 0:
-            Buzzer_BeepAsync(2600, 30);
             SpeedCtl_SetMode(SpeedCtlMode_TURN);
             return ChooseDefaultSpeeds(0, 1);
         case 1:
@@ -577,6 +575,11 @@ static void _TS180_OnComplete(ManeuverStatus status)
 {
     _Generic_OnComplete(status);
     SpeedCtl_SetMode(SpeedCtlMode_STRAIGHT);
+}
+
+static void _TBACK_OnComplete(ManeuverStatus status)
+{
+    Buzzer_BeepTurningBack();
 }
 
 static void _SD_OnComplete(ManeuverStatus status)

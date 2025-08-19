@@ -134,7 +134,7 @@ static void OnDecisionPoint(void)
     else if (maneuver == Maneuver_HALFFWD) {
         consecutiveTurns = 0;
         maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
-        maneuverStatus |= Maneuver_Perform(Maneuver_STOP, 0);
+        maneuverStatus |= Maneuver_Perform(Maneuver_TBACK, 0);
         maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
     }
     else {
@@ -173,7 +173,7 @@ static void OnTargetReached(void)
     }
 
     maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
-    maneuverStatus |= Maneuver_Perform(Maneuver_STOP, 0);
+    maneuverStatus |= Maneuver_Perform(Maneuver_TBACK, 0);
 
     if (maneuverStatus != ManeuverStatus_COMPLETED) {
         state = RouterState_FAILED;

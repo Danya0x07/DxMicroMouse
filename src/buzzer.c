@@ -2,33 +2,26 @@
 #include "mcu.h"
 #include <stdlib.h>
 
-void Buzzer_SetFrequency(unsigned freq)
+static void SetFrequency(unsigned freq)
 {
     /* frequency = APB1_FREQ / ((prescaler + 1) * ARR * 2)
      */
 
-    const uint32_t product = (MCU_rccClocks.PCLK1_Frequency / (uint32_t)freq) >> 1;
-    uint32_t prescaler;
-    uint32_t period;
-
-    for (prescaler = 1; prescaler <= 0xFFFF; prescaler++) {
-        period = product / (prescaler + 1);
-        if (period <= 0xFFFF)
-            break;
-    }
+    const uint32_t product = MCU_rccClocks.PCLK1_Frequency / 1000;
+    uint32_t prescaler = product / (freq << 1) - 1;
 
     TIM_PrescalerConfig(TIM2, (uint16_t)prescaler, TIM_PSCReloadMode_Immediate);
-    TIM_SetAutoreload(TIM2, period);
-    TIM_SetCompare1(TIM2, period);
+    TIM_SetAutoreload(TIM2, 999);
+    TIM_SetCompare1(TIM2, 999);
 }
 
-void Buzzer_Start(void)
+static void Start(void)
 {
     TIM_CtrlPWMOutputs(TIM2, ENABLE);
     TIM_Cmd(TIM2, ENABLE);
 }
 
-void Buzzer_Stop(void)
+static void Stop(void)
 {
     TIM_CtrlPWMOutputs(TIM2, DISABLE);
     TIM_Cmd(TIM2, DISABLE);
@@ -36,24 +29,24 @@ void Buzzer_Stop(void)
 
 void Buzzer_Blink(unsigned times, unsigned freq, unsigned duration)
 {
-    Buzzer_Stop();
-    Buzzer_SetFrequency(freq);
+    Stop();
+    SetFrequency(freq);
     while (times--) {
-        Buzzer_Start();
+        Start();
         Millis_Wait(duration);
-        Buzzer_Stop();
+        Stop();
         Millis_Wait(duration);
     }
 }
 
 void Buzzer_Sing(uint16_t *freqs, unsigned len, unsigned duration)
 {
-    Buzzer_Stop();
+    Stop();
     while (len--) {
-        Buzzer_SetFrequency(*freqs++);
-        Buzzer_Start();
+        SetFrequency(*freqs++);
+        Start();
         Millis_Wait(duration);
-        Buzzer_Stop();
+        Stop();
     }
 }
 
@@ -62,16 +55,71 @@ static uint32_t endTime;
 void Buzzer_BeepAsync(unsigned freq, unsigned duration)
 {
     endTime = Millis_Get() + duration;
-    Buzzer_SetFrequency(freq);
-    Buzzer_Start();
+    SetFrequency(freq);
+    Start();
 }
 
 void Buzzer_Update(void)
 {
     if (endTime && Millis_Get() >= endTime) {
-        Buzzer_Stop();
+        Stop();
         endTime = 0;
     }
+}
+
+void Buzzer_BlinkInitError(unsigned step)
+{
+    Buzzer_Blink(step, 1000, 300);
+}
+
+void Buzzer_BlinkLowBattery(void)
+{
+    Buzzer_Blink(3, 600, 80);
+}
+
+void Buzzer_BlinkWaitingFinger(unsigned step)
+{
+    Buzzer_Blink(1, step * 1000, 50);
+}
+
+void Buzzer_BlinkStopActivity()
+{
+    Buzzer_Blink(2, 900, 80);
+}
+
+void Buzzer_BlinkManeuverFailed()
+{
+    Buzzer_Blink(6, 800, 80);
+}
+
+void Buzzer_SingHappy(void)
+{
+    Buzzer_Sing((uint16_t []){2600, 2900, 3100, 3300, 3600, 3900}, 6, 70);
+}
+
+void Buzzer_SingSetupMode(void)
+{
+    Buzzer_Sing((uint16_t []){1200, 1500, 2000}, 3, 50);
+}
+
+void Buzzer_SingErazeMaze(void)
+{
+    Buzzer_Sing((uint16_t []){2000, 1800}, 2, 50);
+}
+
+void Buzzer_SingRunMode(void)
+{
+    Buzzer_Sing((uint16_t []){2800, 2800, 3300, 4000}, 4, 50);
+}
+
+void Buzzer_BeepManeuverCompleted()
+{
+    Buzzer_BeepAsync(4000, 20);
+}
+
+void Buzzer_BeepTurningBack(void)
+{
+    Buzzer_BeepAsync(2600, 30);
 }
 
 static int execute(int argc, char *argv[])
