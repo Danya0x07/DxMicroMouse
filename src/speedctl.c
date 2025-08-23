@@ -54,6 +54,11 @@ void SpeedCtl_SetState(FunctionalState newState)
     }
 }
 
+FunctionalState SpeedCtl_GetState(void)
+{
+    return state;
+}
+
 void SpeedCtl_SetMode(SpeedCtlMode newMode)
 {
     mode = newMode;

@@ -19,6 +19,11 @@ void Fan_SetPwm(uint16_t pwm)
     TIM_SetCompare1(TIM3, pwm > FAN_PWM_MAX ? FAN_PWM_MAX : pwm);
 }
 
+bool Fan_IsOn(void)
+{
+    return TIM_GetCapture1(TIM3) != 0;
+}
+
 #else
 
 void Fan_On(void)
@@ -34,6 +39,11 @@ void Fan_Off(void)
 void Fan_SetPwm(uint16_t pwm)
 {
     (void)pwm;
+}
+
+bool Fan_IsOn(void)
+{
+    return GPIO_ReadOutputDataBit(MOTORS_GPIO, FAN_PIN) != 0;
 }
 
 #endif

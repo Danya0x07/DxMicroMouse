@@ -62,7 +62,6 @@ static void InitModules(void)
 
     Odometry_Reset();
     SpeedCtl_Setup();
-    Router_Setup();
 
     printf("======= INITIALIZATION FINISHED =======\n");
 }
@@ -143,68 +142,101 @@ static void ShowHappiness(void)
     Millis_Wait(300);
 }
 
+static void StopActivity(void)
+{
+    SpeedCtl_SetState(DISABLE);
+    Sensors_SetState(DISABLE);
+    Fan_Off();
+}
+
+static void executeSetupMode(void)
+{
+    Buzzer_SingSetupMode();
+    printf("Setup mode\n");
+
+    if (GetPress(10)) {
+        Router_EraseMaze();
+        Modules_SaveSettings();
+        printf("Maze erased from RAM\n");
+        Buzzer_SingErazeMaze();
+    }
+
+    for (;;) {
+        Shell_Spin();
+        if (Button_GetEvent() == ButtonEvent_PRESS) {
+            if (SpeedCtl_GetState() == ENABLE || Sensors_GetState() == ENABLE || Fan_IsOn()) {
+                StopActivity();
+                Buzzer_BlinkStopActivity();
+            }
+            else {
+                break;
+            }
+        }
+    }
+}
+
+static void executeRunMode(void)
+{
+    Buzzer_SingRunMode();
+    printf("Run mode\n");
+    if (GetPress(10)) {
+        Router_ChangeStartDirection();
+        Millis_Wait(2000);
+    }
+    SpeedCtl_Reset();
+    SpeedCtl_SetState(ENABLE);
+    Sensors_SetState(ENABLE);
+
+    bool success;
+    for (;;) {
+        WaitForFinger();
+        Router_TargetFinish();
+
+        if (runFast)
+            success = Router_RunFast();
+        else
+            success = Router_RunSearch();
+
+        if (success) {
+            ShowHappiness();
+            Modules_SaveSettings();  // to save known maze
+            Router_TargetStart();
+            success = Router_RunSearch();
+            if (success)
+                Modules_SaveSettings();  // to save known maze
+            else
+                break;
+        }
+        else {
+            break;
+        }
+        CheckBattery();
+    }
+}
+
 int main(void)
 {
     MCU_Init();
-    Sensors_SetLightening(DISABLE);
+    Sensors_SetState(DISABLE);
     LED0_Blink(2, 150);
     printf("\nDxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
 
     InitModules();
-
     Millis_Wait(1000);
-    CheckBattery();
 
     bool setupMode = GetPress(5);
-
-    if (setupMode) {
-        Buzzer_SingSetupMode();
-        printf("Setup mode\n");
-
-        if (GetPress(10)) {
-            Router_EraseMaze();
-            Modules_SaveSettings();
-            printf("Maze erased from RAM\n");
-            Buzzer_SingErazeMaze();
+    for (;;) {
+        Router_Setup();
+        CheckBattery();
+        if (setupMode) {
+            executeSetupMode();
+            setupMode = false;
         }
-
-        for (;;) {
-            Shell_Spin();
-            if (Button_GetEvent() == ButtonEvent_PRESS) {
-                SpeedCtl_SetState(DISABLE);
-                Sensors_SetLightening(DISABLE);
-                Fan_Off();
-                Buzzer_BlinkStopActivity();
-            }
+        else {
+            executeRunMode();
+            setupMode = true;
         }
-    }
-    else {
-        Buzzer_SingRunMode();
-        printf("Run mode\n");
-        if (GetPress(10)) {
-            Router_ChangeStartDirection();
-            Millis_Wait(2000);
-        }
-        SpeedCtl_Reset();
-        SpeedCtl_SetState(ENABLE);
-        Sensors_SetLightening(ENABLE);
-
-        for (;;) {
-            WaitForFinger();
-            Router_TargetFinish();
-            if (runFast) {
-                Router_RunFast();
-            }
-            else {
-                Router_RunSearch();
-            }
-            ShowHappiness();
-            Modules_SaveSettings();  // to save known maze
-            Router_TargetStart();
-            Router_RunSearch();
-            Modules_SaveSettings();  // to save known maze
-            CheckBattery();
-        }
+        StopActivity();
     }
 }
 

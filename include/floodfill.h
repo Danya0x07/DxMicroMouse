@@ -21,11 +21,11 @@ void Floodfill_Setup(struct MazeCell goalCell, bool extendGoalCell);
  */
 uint_fast16_t Floodfill_FindMinimumOpenNeighbor(struct MazeCell cell, struct MazeCell *minNeighbor);
 
-/** Recompute distances around cell (x,y)
+/** Recompute distances around cell (x,y), returns true on success
  * Call if in the current cell the wall is detected and added to maze map
  * (after Maze_AddWall(x, y))
  */
-void Floodfill_RecomputeFromCell(struct MazeCell cell);
+bool Floodfill_RecomputeFromCell(struct MazeCell cell);
 
 /** Get coordinates of the cell the robot should move to if it is now at given cell
  */

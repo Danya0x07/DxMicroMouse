@@ -10,6 +10,7 @@
 #include <string.h>
 
 #define MAX_CONSECUTIVE_TURNS   2
+#define MAX_ROUTE_LEN   256
 
 typedef enum {
     RouterState_IDLE,
@@ -63,18 +64,23 @@ static void UpdateWalls(void)
 {
     struct SensorsWalls walls;
     Sensors_ReadWalls(&walls);
+    bool success = true;
 
     if (walls.front) {
         Maze_AddWallRelative(cell, direction, MAZE_UP);
-        Floodfill_RecomputeFromCell(cell);
+        success &= Floodfill_RecomputeFromCell(cell);
     }
     if (walls.left) {
         Maze_AddWallRelative(cell, direction, MAZE_LEFT);
-        Floodfill_RecomputeFromCell(cell);
+        success &= Floodfill_RecomputeFromCell(cell);
     }
     if (walls.right) {
         Maze_AddWallRelative(cell, direction, MAZE_RIGHT);
-        Floodfill_RecomputeFromCell(cell);
+        success &= Floodfill_RecomputeFromCell(cell);
+    }
+
+    if (!success) {
+        state = RouterState_FAILED;
     }
 }
 
@@ -87,7 +93,7 @@ static void OnStart(void)
     Maneuver_BindDisposableBacktrimCallback(UpdateWalls);
     ManeuverStatus maneuverStatus = Maneuver_Perform(Maneuver_BTR2M, 1); // Стены проверяются когда упёрлись в зад
 
-    if (maneuverStatus != ManeuverStatus_COMPLETED) {
+    if (maneuverStatus != ManeuverStatus_COMPLETED || state != RouterState_STARTING) {
         state = RouterState_FAILED;
         return;
     }
@@ -104,14 +110,18 @@ static void OnStart(void)
  *  - Повернуть по дуге направо/налево и попасть в соответствующую ТПР;
  *  - Развернуться назад (если смотрим в тупик), то есть:
  *      - Затормозить и остановиться в центре ячейки, в которую сейчас смотрим;
- *      - [Опционально] Откалиброватться фронтальным датчиком о стенку;
  *      - Развернуться на месте на 180;
+ *      - Откалиброваться задом о стену.
  *      - Двинуться вперёд и попасть в ТПР, где сейчас находимся, но будучи развёрнутыми в противоположную сторону;
  *
- * Если ячейка, в которую сейчас смотрим, есть целевая ячейка, то переходим в состояние FINISHING */
+ * Если ячейка, в которую сейчас смотрим, есть целевая ячейка, то переходим в состояние FINISHING.
+ * Если предстоит повернуть, а до этого поворачивали уже MAX_CONSECUTIVE_TURNS раз подряд, то вместо поворота по дуге
+ * выравниваемся жопой об стену, если она есть. */
 static void OnDecisionPoint(void)
 {
     UpdateWalls();
+    if (state != RouterState_RUNNING)
+        return;
 
     struct MazeCell nextCell = Floodfill_NextCell(cell);
     unsigned nextCellDirection = Maze_GetDirection(cell, nextCell); // с какой стороны сл. ячейка от текущей
@@ -121,7 +131,10 @@ static void OnDecisionPoint(void)
 
     if (maneuver == Maneuver_LS90 || maneuver == Maneuver_RS90) {
         consecutiveTurns++;
-        if (consecutiveTurns > MAX_CONSECUTIVE_TURNS) {
+        bool haveWallToTrim = (maneuver == Maneuver_LS90 && Maze_CellHasWallOnSide(cell, direction, MAZE_RIGHT))
+                           || (maneuver == Maneuver_RS90 && Maze_CellHasWallOnSide(cell, direction, MAZE_LEFT));
+
+        if (consecutiveTurns > MAX_CONSECUTIVE_TURNS && haveWallToTrim) {
             maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
             maneuverStatus |= Maneuver_Perform(maneuver == Maneuver_LS90 ? Maneuver_LP90 : Maneuver_RP90, 0);
             maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
@@ -131,7 +144,7 @@ static void OnDecisionPoint(void)
             maneuverStatus = Maneuver_Perform(maneuver, 1);
         }
     }
-    else if (maneuver == Maneuver_HALFFWD) {
+    else if (maneuver == MANEUVERS[MAZE_DOWN]) {
         consecutiveTurns = 0;
         maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
         maneuverStatus |= Maneuver_Perform(Maneuver_TBACK, 0);
@@ -162,6 +175,8 @@ static void OnTargetReached(void)
 {
     ManeuverStatus maneuverStatus;
     UpdateWalls();
+    if (state != RouterState_FINISHING)
+        return;
 
     if (!Maze_CellHasWallOnSide(cell, direction, MAZE_UP)) {
         if ((maneuverStatus = Maneuver_Perform(Maneuver_FWD, 1)) != ManeuverStatus_COMPLETED) {
@@ -170,6 +185,8 @@ static void OnTargetReached(void)
         }
         cell = Maze_GetNeighbor(cell, direction);
         UpdateWalls();
+        if (state != RouterState_FINISHING)
+            return;
     }
 
     maneuverStatus = Maneuver_Perform(Maneuver_HALFFWD, 0);
@@ -220,7 +237,8 @@ void Router_Setup(void)
 
 void Router_ChangeStartDirection(void)
 {
-    direction = MAZE_RIGHT;
+    params.startDirection = params.startDirection == MAZE_UP ? MAZE_RIGHT : MAZE_UP;
+    direction = params.startDirection;
 }
 
 void Router_TargetFinish(void)
@@ -253,19 +271,83 @@ bool Router_RunSearch(void)
     return true;
 }
 
+static int BuildRoute(uint8_t route[], int maxlen)
+{
+    // cell = startCell; direction = startDirection
+    memset(route, Maneuver_NONE, maxlen);
+
+    // Backtrim & Start
+    route[0] = (uint8_t)Maneuver_BTR2M;
+    cell = Maze_GetNeighbor(cell, direction);
+    int routeLen = 1;
+
+    struct MazeCell nextCell;
+    unsigned nextCellDirection, nextMoveDirection;
+    enum Maneuver maneuver;
+
+    while (Floodfill_GetDistance(cell) != 0) {
+        nextCell = Floodfill_NextCell(cell);
+        nextCellDirection = Maze_GetDirection(cell, nextCell);
+        nextMoveDirection = Maze_GetRelativeDirection(direction, nextCellDirection);
+        maneuver = MANEUVERS[nextMoveDirection];
+
+        if (maneuver == MANEUVERS[MAZE_DOWN]) {
+            return -1;
+        }
+        if (routeLen + 1 > maxlen) {
+            return -2;
+        }
+
+        route[routeLen++] = (uint8_t)maneuver;
+        cell = nextCell;
+        direction = nextCellDirection;
+    }
+
+    if (!Maze_CellHasWallOnSide(cell, direction, MAZE_UP)) {
+        if (routeLen + 1 > maxlen) {
+            return -2;
+        }
+        route[routeLen++] = (uint8_t)Maneuver_FWD;
+        cell = Maze_GetNeighbor(cell, direction);
+    }
+
+    if (routeLen + 2 > maxlen) {
+        return -2;
+    }
+    route[routeLen++] = (uint8_t)Maneuver_HALFFWD;
+    route[routeLen++] = (uint8_t)Maneuver_TBACK;
+    direction = Maze_GetOppositeDirection(direction);
+
+    return routeLen;
+}
+
 bool Router_RunFast(void)
 {
+    uint8_t route[MAX_ROUTE_LEN];
+    int routeLen = BuildRoute(route, MAX_ROUTE_LEN);
+
+    if (routeLen < 0) {
+        printf("BuildRoute err: %d\n", routeLen);
+        return false;
+    }
+
     state = RouterState_RUNNING;
     Maneuver_SetMode(ManeuverMode_FAST);
-    // Calc route
     Fan_On();
     Millis_Wait(1000);
-    // Run
+
+    for (int i = 0; i < routeLen; i++) {
+        if (Maneuver_Perform((enum Maneuver)route[i], i < routeLen - 2) != ManeuverStatus_COMPLETED) {
+            state = RouterState_FAILED;
+            return false;
+        }
+    }
+
     Fan_Off();
     Maze_Print(PrintMazeMeta);
     state = RouterState_IDLE;
 
-    return false;
+    return true;
 }
 
 void Router_EraseMaze(void)
@@ -323,8 +405,7 @@ static int execute(int argc, char *argv[])
         unsigned side = atoi(argv[1]) & 3;
 
         Maze_AddWallRelative(cell, direction, side);
-        Floodfill_RecomputeFromCell(cell);
-        printf("Floodfill recomputed\n");
+        printf("Floodfill recomputed, %d\n", Floodfill_RecomputeFromCell(cell));
     }
     else if (!strcmp(argv[0], "rst")) {
         Router_Setup();

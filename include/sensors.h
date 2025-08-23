@@ -18,7 +18,8 @@ struct SensorsWalls {
 };
 
 extern void (*Sensors_Update)(void);
-void Sensors_SetLightening(FunctionalState state);
+void Sensors_SetState(FunctionalState state);
+FunctionalState Sensors_GetState(void);
 void Sensors_ReadDistance(struct SensorsDistance *distance);
 void Sensors_ReadWalls(struct SensorsWalls *walls);
 bool Sensors_DetectFinger(void);

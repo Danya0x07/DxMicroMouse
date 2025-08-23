@@ -126,12 +126,12 @@ uint_fast16_t Floodfill_FindMinimumOpenNeighbor(struct MazeCell cell, struct Maz
     return minDistance;
 }
 
-void Floodfill_RecomputeFromCell(struct MazeCell cell)
+bool Floodfill_RecomputeFromCell(struct MazeCell cell)
 {
     uint_fast16_t distance, minDistance;
 
-    Queue_Push(&cellQueue, &cell);
-    while (!Queue_IsEmpty(&cellQueue)) {
+    int retcode = Queue_Push(&cellQueue, &cell);
+    while (!Queue_IsEmpty(&cellQueue) && !retcode) {
         Queue_Pop(&cellQueue, &cell);
 
         distance = Maze_ReadCellMetadata(cell);
@@ -140,15 +140,16 @@ void Floodfill_RecomputeFromCell(struct MazeCell cell)
         if (minDistance != distance - 1 && distance != 0) {
             Maze_WriteCellMetadata(cell, minDistance + 1);
             if (cell.y < mazeM - 1)
-                Queue_Push(&cellQueue, &(struct MazeCell){cell.x, cell.y + 1});
+                retcode |= Queue_Push(&cellQueue, &(struct MazeCell){cell.x, cell.y + 1});
             if (cell.y > 0)
-                Queue_Push(&cellQueue, &(struct MazeCell){cell.x, cell.y - 1});
+                retcode |= Queue_Push(&cellQueue, &(struct MazeCell){cell.x, cell.y - 1});
             if (cell.x < mazeN - 1)
-                Queue_Push(&cellQueue, &(struct MazeCell){cell.x + 1, cell.y});
+                retcode |= Queue_Push(&cellQueue, &(struct MazeCell){cell.x + 1, cell.y});
             if (cell.x > 0)
-                Queue_Push(&cellQueue, &(struct MazeCell){cell.x - 1, cell.y});
+                retcode |= Queue_Push(&cellQueue, &(struct MazeCell){cell.x - 1, cell.y});
         }
     }
+    return !retcode;
 }
 
 struct MazeCell Floodfill_NextCell(struct MazeCell currentCell)

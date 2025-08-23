@@ -127,9 +127,14 @@ static void UpdateWithoutLightening(void)
 
 void (*Sensors_Update)(void) = Update;
 
-void Sensors_SetLightening(FunctionalState state)
+void Sensors_SetState(FunctionalState state)
 {
     Sensors_Update = state ? Update : UpdateWithoutLightening;
+}
+
+FunctionalState Sensors_GetState(void)
+{
+    return Sensors_Update == Update ? ENABLE : DISABLE;
 }
 
 void Sensors_ReadDistance(struct SensorsDistance *d)
@@ -197,9 +202,9 @@ static int execute(int argc, char *argv[])
         return -1;
 
     if (!strcmp(argv[0], "lon"))
-        Sensors_SetLightening(ENABLE);
+        Sensors_SetState(ENABLE);
     else if (!strcmp(argv[0], "loff"))
-        Sensors_SetLightening(DISABLE);
+        Sensors_SetState(DISABLE);
     else if (!strcmp(argv[0], "lcal"))
         Sensors_Update = UpdateForCalibration;
     else if (!strcmp(argv[0], "tm") && argc == 2)

@@ -13,6 +13,7 @@ typedef enum {
 
 void SpeedCtl_Reset(void);
 void SpeedCtl_SetState(FunctionalState newState);
+FunctionalState SpeedCtl_GetState(void);
 void SpeedCtl_SetMode(SpeedCtlMode newMode);
 void SpeedCtl_Setup(void);
 void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS);
