@@ -212,6 +212,7 @@ static void executeRunMode(void)
         }
         CheckBattery();
     }
+    StopActivity();
     Buzzer_BlinkManeuverFailed();
 }
 
@@ -237,7 +238,6 @@ int main(void)
             executeRunMode();
             setupMode = true;
         }
-        StopActivity();
     }
 }
 

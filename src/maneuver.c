@@ -42,8 +42,8 @@ static struct ManeuverConfig {
             .aTrans = 4000,
             .aRot = 8000
         },
-        .vTransTurn = 360,
-        .vTransDash = 400,
+        .vTransTurn = 400,
+        .vTransDash = 700,
         .vRot = 1080
     }
 };
@@ -471,9 +471,9 @@ static Speeds _BTR_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
         case 1:
             return ChooseDefaultSpeeds(0, 0);
         case 2:
-            Millis_Wait(200);
+            Millis_Wait(100);
             SpeedCtl_Reset();
-            Millis_Wait(200);
+            Millis_Wait(100);
             if (disposableBacktrimCallback) {
                 disposableBacktrimCallback();
                 disposableBacktrimCallback = NULL;
