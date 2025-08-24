@@ -42,8 +42,8 @@ static struct ManeuverConfig {
             .aTrans = 4000,
             .aRot = 8000
         },
-        .vTransTurn = 600,
-        .vTransDash = 1000,
+        .vTransTurn = 360,
+        .vTransDash = 400,
         .vRot = 1080
     }
 };
@@ -94,7 +94,7 @@ static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
 /* ========== Maneuver-specific OnComplete callbacks ========== */
 //~ static void _BTR_OnComplete(ManeuverStatus status);
 static void _FWD_OnComplete(ManeuverStatus status);
-static void _HALFFWD_OnComplete(ManeuverStatus status);
+static void _HFWD_OnComplete(ManeuverStatus status);
 static void _DFWD_OnComplete(ManeuverStatus status);
 //~ static void _TS90_OnComplete(ManeuverStatus status);
 static void _TS180_OnComplete(ManeuverStatus status);
@@ -132,12 +132,12 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .loop = _BTR_Loop,
         .onComplete = _BTR_OnComplete
     },
-    [Maneuver_HALFFWD] = {
+    [Maneuver_HFWD] = {
         .motions = (const struct Motion *[]){&MOTION_FWD_M2C},
         .numMotions = 1,
         .onNextMotion = _FWD_OnNextMotion,
         .loop = _FWD_Loop,
-        .onComplete = _HALFFWD_OnComplete
+        .onComplete = _HFWD_OnComplete
     },
     [Maneuver_FWD] = {
         .motions = (const struct Motion *[]){&MOTION_FWD_M2M},
@@ -283,6 +283,33 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .loop = _DASH_Loop,
         .onComplete = _DASH_OnComplete
     }
+};
+
+const char *const MANEUVERS_STR[] = {
+    [Maneuver_NONE] = "NONE",
+    [Maneuver_BTR2M] = "BTR2M",
+    [Maneuver_BTR2C] = "BTR2C",
+    [Maneuver_HFWD] = "HFWD",
+    [Maneuver_FWD] = "FWD",
+    [Maneuver_DFWD] = "DFWD",
+    [Maneuver_LP90] = "LP90",
+    [Maneuver_RP90] = "RP90",
+    [Maneuver_LS90] = "LS90",
+    [Maneuver_RS90] = "RS90",
+    [Maneuver_LS180] = "LS180",
+    [Maneuver_RS180] = "RS180",
+    [Maneuver_TBACK] = "TBACK",
+    [Maneuver_SDL45] = "SDL45",
+    [Maneuver_SDR45] = "SDR45",
+    [Maneuver_FDL45] = "FDL45",
+    [Maneuver_FDR45] = "FDR45",
+    [Maneuver_SDL135] = "SDL135",
+    [Maneuver_SDR135] = "SDR135",
+    [Maneuver_FDL135] = "FDL135",
+    [Maneuver_FDR135] = "FDR135",
+    [Maneuver_D2DL] = "D2DL",
+    [Maneuver_D2DR] = "D2DR",
+    [Maneuver_DASH] = "DASH"
 };
 
 /* ========== Public functions ========== */
@@ -559,7 +586,7 @@ static void _FWD_OnComplete(ManeuverStatus status)
     UpdateDistanceError(MOTION_FWD_M2M.distanceInMm);
 }
 
-static void _HALFFWD_OnComplete(ManeuverStatus status)
+static void _HFWD_OnComplete(ManeuverStatus status)
 {
     CheckStatus(status);
     UpdateDistanceError(MOTION_FWD_M2C.distanceInMm);

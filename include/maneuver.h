@@ -12,7 +12,7 @@ enum Maneuver {
     Maneuver_NONE = 0,
     Maneuver_BTR2M,
     Maneuver_BTR2C,
-    Maneuver_HALFFWD,
+    Maneuver_HFWD,
     Maneuver_FWD,
     Maneuver_DFWD,
     Maneuver_LP90,
@@ -36,6 +36,8 @@ enum Maneuver {
     // Customizeable straight-shortcut maneuver
     Maneuver_DASH
 };
+
+extern const char *const MANEUVERS_STR[];
 
 typedef enum ManeuverMode {
     ManeuverMode_SEARCH,
