@@ -55,40 +55,43 @@ void Maze_GetDimensions(uint_fast8_t *n, uint_fast8_t *m);
 /** Add a wall to the side of cell in maze global orientation frame (NWSE)
  * This also adds that wall to adjacent cell side.
  */
-void Maze_AddWall(struct MazeCell cell, uint_fast16_t wall);
+void Maze_AddWall(const struct MazeCell *cell, uint_fast16_t wall);
 
 /** Add a wall to the side of cell with respect to robot current direction
  * This also adds that wall to adjacent cell side.
  */
-void Maze_AddWallRelative(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side);
+void Maze_AddWallRelative(const struct MazeCell *cell, uint_fast8_t dir, uint_fast8_t side);
 
 /** Remove a wall from the side of cell (x,y) in maze global orientation frame (NWSE)
  * This also removes that wall from adjacent cell side.
  */
-void Maze_RemoveWall(struct MazeCell cell, uint_fast16_t wall);
+void Maze_RemoveWall(const struct MazeCell *cell, uint_fast16_t wall);
 
 /** Remove a wall from the side of cell (x,y) with respect to robot current direction
  * This also removes that wall from adjacent cell side.
  */
-void Maze_RemoveWallRelative(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side);
+void Maze_RemoveWallRelative(const struct MazeCell *cell, uint_fast8_t dir, uint_fast8_t side);
 
 /// Check if cell (x,y) has any of walls from mask
-bool Maze_CellHasAnyWall(struct MazeCell cell, uint_fast16_t walls);
+bool Maze_CellHasAnyWall(const struct MazeCell *cell, uint_fast16_t walls);
 
 /// Check if cell (x,y) has all of walls from mask
-bool Maze_CellHasAllWalls(struct MazeCell cell, uint_fast16_t walls);
+bool Maze_CellHasAllWalls(const struct MazeCell *cell, uint_fast16_t walls);
 
 /// Check if cell (x,y) has wall in given side with respect to robot current direction.
-bool Maze_CellHasWallOnSide(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side);
+bool Maze_CellHasWallOnSide(const struct MazeCell *cell, uint_fast8_t dir, uint_fast8_t side);
+
+/// Check if cells c1 and c2 have same coordinates.
+bool Maze_CellsMatch(const struct MazeCell *c1, const struct MazeCell *c2);
 
 /// Write metadata (MAZEWALLSHIFT bits) to cell (x,y)
-void Maze_WriteCellMetadata(struct MazeCell cell, uint16_t metadata);
+void Maze_WriteCellMetadata(const struct MazeCell *cell, uint16_t metadata);
 
 /// Read metadata (MAZEWALLSHIFT bits) of cell (x,y)
-uint16_t Maze_ReadCellMetadata(struct MazeCell cell);
+uint16_t Maze_ReadCellMetadata(const struct MazeCell *cell);
 
 /// Get direction to one cell from another
-uint_fast8_t Maze_GetDirection(struct MazeCell from, struct MazeCell to);
+uint_fast8_t Maze_GetDirection(const struct MazeCell *from, const struct MazeCell *to);
 
 /// Get direction with respect to current facing direction
 uint_fast8_t Maze_GetRelativeDirection(uint_fast8_t facingDirection, uint_fast8_t globalDirection);
@@ -97,14 +100,14 @@ uint_fast8_t Maze_GetRelativeDirection(uint_fast8_t facingDirection, uint_fast8_
 uint_fast8_t Maze_GetOppositeDirection(uint_fast8_t direction);
 
 /// Get cell that is next to given cell in given direction
-struct MazeCell Maze_GetNeighbor(struct MazeCell cell, uint_fast8_t direction);
+void Maze_GetNeighbor(struct MazeCell *neighbor, const struct MazeCell *cell, uint_fast8_t direction);
 
 /** Print maze state.
  * printMeta should fill up to 5 bytes of the argument array (6th is for '\0') and return number of characters written.
  * meta[0..4] will be printed in first row in a cell when row == 0, in the second row when 1.
  * Pass NULL if this not needed.
  */
-void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char meta[6]));
+void Maze_Print(int (*printMeta)(const struct MazeCell *cell, uint_fast8_t row, char meta[6]));
 
 /// Serialize wall information to byte array of MAZEMAXLEN^2/2 elements
 void Maze_SerializeWalls(uint8_t *array);

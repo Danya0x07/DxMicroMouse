@@ -17,12 +17,12 @@ void Maze_Init(uint_fast8_t n, uint_fast8_t m)
 
     // Fill surrounding walls
     for (uint_fast8_t i = 0; i < n; i++) {
-        Maze_AddWall((struct MazeCell){i, 0}, MAZEWALL_SOUTH);
-        Maze_AddWall((struct MazeCell){i, maze.m - 1}, MAZEWALL_NORTH);
+        Maze_AddWall(&(struct MazeCell){i, 0}, MAZEWALL_SOUTH);
+        Maze_AddWall(&(struct MazeCell){i, maze.m - 1}, MAZEWALL_NORTH);
     }
     for (uint_fast8_t i = 0; i < m; i++) {
-        Maze_AddWall((struct MazeCell){0, i}, MAZEWALL_WEST);
-        Maze_AddWall((struct MazeCell){maze.n - 1, i}, MAZEWALL_EAST);
+        Maze_AddWall(&(struct MazeCell){0, i}, MAZEWALL_WEST);
+        Maze_AddWall(&(struct MazeCell){maze.n - 1, i}, MAZEWALL_EAST);
     }
 }
 
@@ -41,107 +41,112 @@ void Maze_GetDimensions(uint_fast8_t *n, uint_fast8_t *m)
     *m = maze.m;
 }
 
-void Maze_AddWall(struct MazeCell cell, uint_fast16_t wall)
+void Maze_AddWall(const struct MazeCell *cell, uint_fast16_t wall)
 {
-    if (cell.x >= maze.n || cell.y >= maze.m)
+    if (cell->x >= maze.n || cell->y >= maze.m)
         return;
 
     wall &= WALL_MASK;
-    maze.cells[cell.x][cell.y] |= wall;
+    maze.cells[cell->x][cell->y] |= wall;
 
     uint_fast16_t opposite = ((wall << 2) | (wall >> 2)) & WALL_MASK;
 
-    if (cell.x < maze.n - 1)
-        maze.cells[cell.x + 1][cell.y] |= opposite & MAZEWALL_WEST;
-    if (cell.x > 0)
-        maze.cells[cell.x - 1][cell.y] |= opposite & MAZEWALL_EAST;
-    if (cell.y < maze.m - 1)
-        maze.cells[cell.x][cell.y + 1] |= opposite & MAZEWALL_SOUTH;
-    if (cell.y > 0)
-        maze.cells[cell.x][cell.y - 1] |= opposite & MAZEWALL_NORTH;
+    if (cell->x < maze.n - 1)
+        maze.cells[cell->x + 1][cell->y] |= opposite & MAZEWALL_WEST;
+    if (cell->x > 0)
+        maze.cells[cell->x - 1][cell->y] |= opposite & MAZEWALL_EAST;
+    if (cell->y < maze.m - 1)
+        maze.cells[cell->x][cell->y + 1] |= opposite & MAZEWALL_SOUTH;
+    if (cell->y > 0)
+        maze.cells[cell->x][cell->y - 1] |= opposite & MAZEWALL_NORTH;
 }
 
-void Maze_AddWallRelative(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side)
+void Maze_AddWallRelative(const struct MazeCell *cell, uint_fast8_t dir, uint_fast8_t side)
 {
     uint_fast16_t wall = 1 << (uint_fast16_t)(((dir + side) & 3) + MAZEWALLSHIFT);
     Maze_AddWall(cell, wall);
 }
 
-void Maze_RemoveWall(struct MazeCell cell, uint_fast16_t wall)
+void Maze_RemoveWall(const struct MazeCell *cell, uint_fast16_t wall)
 {
-    if (cell.x >= maze.n || cell.y >= maze.m)
+    if (cell->x >= maze.n || cell->y >= maze.m)
         return;
 
     wall &= WALL_MASK;
-    maze.cells[cell.x][cell.y] &= ~wall;
+    maze.cells[cell->x][cell->y] &= ~wall;
 
     uint_fast16_t opposite = ((wall << 2) | (wall >> 2)) & WALL_MASK;
 
-    if (cell.x < maze.n - 1)
-        maze.cells[cell.x + 1][cell.y] &= ~(opposite & MAZEWALL_WEST);
-    if (cell.x > 0)
-        maze.cells[cell.x - 1][cell.y] &= ~(opposite & MAZEWALL_EAST);
-    if (cell.y < maze.m - 1)
-        maze.cells[cell.x][cell.y + 1] &= ~(opposite & MAZEWALL_SOUTH);
-    if (cell.y > 0)
-        maze.cells[cell.x][cell.y - 1] &= ~(opposite & MAZEWALL_NORTH);
+    if (cell->x < maze.n - 1)
+        maze.cells[cell->x + 1][cell->y] &= ~(opposite & MAZEWALL_WEST);
+    if (cell->x > 0)
+        maze.cells[cell->x - 1][cell->y] &= ~(opposite & MAZEWALL_EAST);
+    if (cell->y < maze.m - 1)
+        maze.cells[cell->x][cell->y + 1] &= ~(opposite & MAZEWALL_SOUTH);
+    if (cell->y > 0)
+        maze.cells[cell->x][cell->y - 1] &= ~(opposite & MAZEWALL_NORTH);
 }
 
-void Maze_RemoveWallRelative(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side)
+void Maze_RemoveWallRelative(const struct MazeCell *cell, uint_fast8_t dir, uint_fast8_t side)
 {
     uint_fast16_t wall = 1 << (uint_fast16_t)(((dir + side) & 3) + MAZEWALLSHIFT);
     Maze_RemoveWall(cell, wall);
 }
 
-bool Maze_CellHasAnyWall(struct MazeCell cell, uint_fast16_t walls)
+bool Maze_CellHasAnyWall(const struct MazeCell *cell, uint_fast16_t walls)
 {
-    if (cell.x >= maze.n || cell.y >= maze.m)
+    if (cell->x >= maze.n || cell->y >= maze.m)
         return true;
 
     walls &= WALL_MASK;
-    return !!(maze.cells[cell.x][cell.y] & walls);
+    return !!(maze.cells[cell->x][cell->y] & walls);
 }
 
-bool Maze_CellHasAllWalls(struct MazeCell cell, uint_fast16_t walls)
+bool Maze_CellHasAllWalls(const struct MazeCell *cell, uint_fast16_t walls)
 {
-    if (cell.x >= maze.n || cell.y >= maze.m)
+    if (cell->x >= maze.n || cell->y >= maze.m)
         return true;
 
     walls &= WALL_MASK;
-    return (maze.cells[cell.x][cell.y] & walls) == walls;
+    return (maze.cells[cell->x][cell->y] & walls) == walls;
 }
 
-bool Maze_CellHasWallOnSide(struct MazeCell cell, uint_fast8_t dir, uint_fast8_t side)
+bool Maze_CellHasWallOnSide(const struct MazeCell *cell, uint_fast8_t dir, uint_fast8_t side)
 {
     uint_fast16_t wall = 1 << (uint_fast16_t)(((dir + side) & 3) + MAZEWALLSHIFT);
     return Maze_CellHasAnyWall(cell, wall);
 }
 
-void Maze_WriteCellMetadata(struct MazeCell cell, uint16_t metadata)
+bool Maze_CellsMatch(const struct MazeCell *c1, const struct MazeCell *c2)
 {
-    if (cell.x >= maze.n || cell.y >= maze.m)
+    return c1->x == c2->x && c1->y == c2->y;
+}
+
+void Maze_WriteCellMetadata(const struct MazeCell *cell, uint16_t metadata)
+{
+    if (cell->x >= maze.n || cell->y >= maze.m)
         return;
 
     metadata &= METADATA_MASK;
-    maze.cells[cell.x][cell.y] &= WALL_MASK;
-    maze.cells[cell.x][cell.y] |= metadata;
+    maze.cells[cell->x][cell->y] &= WALL_MASK;
+    maze.cells[cell->x][cell->y] |= metadata;
 }
 
-uint16_t Maze_ReadCellMetadata(struct MazeCell cell)
+uint16_t Maze_ReadCellMetadata(const struct MazeCell *cell)
 {
-    if (cell.x >= maze.n || cell.y >= maze.m)
+    if (cell->x >= maze.n || cell->y >= maze.m)
         return 0xFFFF;
 
-    return maze.cells[cell.x][cell.y] & METADATA_MASK;
+    return maze.cells[cell->x][cell->y] & METADATA_MASK;
 }
 
-uint_fast8_t Maze_GetDirection(struct MazeCell from, struct MazeCell to)
+uint_fast8_t Maze_GetDirection(const struct MazeCell *from, const struct MazeCell *to)
 {
-    if (to.y > from.y)
+    if (to->y > from->y)
         return MAZE_UP;
-    if (to.y < from.y)
+    if (to->y < from->y)
         return MAZE_DOWN;
-    if (to.x > from.x)
+    if (to->x > from->x)
         return MAZE_RIGHT;
     return MAZE_LEFT;
 }
@@ -156,41 +161,43 @@ uint_fast8_t Maze_GetOppositeDirection(uint_fast8_t direction)
     return (direction + 2) & 3;
 }
 
-struct MazeCell Maze_GetNeighbor(struct MazeCell cell, uint_fast8_t direction)
+void Maze_GetNeighbor(struct MazeCell *neighbor, const struct MazeCell *cell, uint_fast8_t direction)
 {
+    struct MazeCell _cell = *cell;
+
     switch (direction) {
         case MAZE_UP:
-            if (cell.y < maze.m - 1)
-                cell.y++;
+            if (_cell.y < maze.m - 1)
+                _cell.y++;
             break;
 
         case MAZE_DOWN:
-            if (cell.y > 0)
-                cell.y--;
+            if (_cell.y > 0)
+                _cell.y--;
             break;
 
         case MAZE_LEFT:
-            if (cell.x > 0)
-                cell.x--;
+            if (_cell.x > 0)
+                _cell.x--;
             break;
 
         case MAZE_RIGHT:
-            if (cell.x < maze.n - 1)
-                cell.x++;
+            if (_cell.x < maze.n - 1)
+                _cell.x++;
             break;
 
         default:    break;
     }
-    return cell;
+    *neighbor = _cell;
 }
 
-void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char meta[6]))
+void Maze_Print(int (*printMeta)(const struct MazeCell *cell, uint_fast8_t row, char meta[6]))
 {
     for (int_fast8_t y = maze.m - 1; y >= 0; y--) {
         // North wall row
         for (int_fast8_t x = 0; x < maze.n; x++) {
             MAZE_PUTC('+');
-            if (Maze_CellHasAnyWall((struct MazeCell){x, y}, MAZEWALL_NORTH))
+            if (Maze_CellHasAnyWall(&(struct MazeCell){x, y}, MAZEWALL_NORTH))
                 MAZE_PUTS("-----");
             else
                 MAZE_PUTS("     ");
@@ -201,7 +208,7 @@ void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char me
         // Metadata rows
         for (uint_fast8_t r = 0; r < 2; r++) {
             for (int_fast8_t x = 0; x < maze.n; x++) {
-                if (Maze_CellHasAnyWall((struct MazeCell){x, y}, MAZEWALL_WEST))
+                if (Maze_CellHasAnyWall(&(struct MazeCell){x, y}, MAZEWALL_WEST))
                     MAZE_PUTC('|');
                 else
                     MAZE_PUTC(' ');
@@ -209,7 +216,7 @@ void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char me
                     char metaStr[6] = "     ";
                     char tmp[6];
 
-                    int len = printMeta((struct MazeCell){x, y}, r, tmp);
+                    int len = printMeta(&(struct MazeCell){x, y}, r, tmp);
                     memcpy(metaStr + (5 - len) / 2, tmp, len);
                     MAZE_PUTS((const char *)metaStr);
                 }
@@ -217,7 +224,7 @@ void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char me
                     MAZE_PUTS("     ");
                 }
             }
-            if (Maze_CellHasAnyWall((struct MazeCell){maze.n - 1, y}, MAZEWALL_EAST))
+            if (Maze_CellHasAnyWall(&(struct MazeCell){maze.n - 1, y}, MAZEWALL_EAST))
                 MAZE_PUTC('|');
             else
                 MAZE_PUTC(' ');
@@ -228,7 +235,7 @@ void Maze_Print(int (*printMeta)(struct MazeCell cell, uint_fast8_t row, char me
     // South wall row of the bottom cells
     for (int_fast8_t x = 0; x < maze.n; x++) {
         MAZE_PUTC('+');
-        if (Maze_CellHasAnyWall((struct MazeCell){x, 0}, MAZEWALL_SOUTH))
+        if (Maze_CellHasAnyWall(&(struct MazeCell){x, 0}, MAZEWALL_SOUTH))
             MAZE_PUTS("-----");
         else
             MAZE_PUTS("     ");

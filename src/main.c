@@ -160,6 +160,7 @@ static void executeSetupMode(void)
         printf("Maze erased from RAM\n");
         Buzzer_SingErazeMaze();
     }
+    Router_Setup();
 
     for (;;) {
         Shell_Spin();
@@ -183,6 +184,8 @@ static void executeRunMode(void)
         Router_ChangeStartDirection();
         Millis_Wait(2000);
     }
+    Router_Setup();
+
     SpeedCtl_Reset();
     SpeedCtl_SetState(ENABLE);
     Sensors_SetState(ENABLE);
@@ -228,7 +231,6 @@ int main(void)
 
     bool setupMode = GetPress(5);
     for (;;) {
-        Router_Setup();
         CheckBattery();
         if (setupMode) {
             executeSetupMode();

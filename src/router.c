@@ -22,23 +22,27 @@ typedef enum {
 } RouterState;
 
 static RouterState routerState = RouterState_IDLE;
-static struct MazeCell cell = {0, 0};
-static unsigned direction = MAZE_UP;
-static unsigned consecutiveTurns = 0;
-static uint8_t route[MAX_ROUTE_LEN];
-static int routeLen = MAX_ROUTE_LEN;
-static uint16_t dashDistances[MAX_DASHES];
+
+static struct Pose {
+    struct MazeCell cell;
+    unsigned direction;
+} pose = {{0, 0}, MAZE_UP};
+
+static struct Route {
+    uint8_t mnvs[MAX_ROUTE_LEN];
+    uint16_t dashes[MAX_DASHES];
+    int len;
+} route;
 
 static struct {
     unsigned mazeN, mazeM;
-    struct MazeCell startCell, goalCell;
-    unsigned startDirection;
+    struct Pose startPose;
+    struct MazeCell goalCell;
     bool extendGoal;
 } params = {
     .mazeN = 3, .mazeM = 3,
-    .startCell = (struct MazeCell){0, 0},
+    .startPose = {{0, 0}, MAZE_UP},
     .goalCell = (struct MazeCell){2, 2},
-    .startDirection = MAZE_UP,
     .extendGoal = false
 };
 
@@ -49,40 +53,37 @@ static const enum Maneuver MANEUVERS[4] = {
     [MAZE_RIGHT] = Maneuver_RS90
 };
 
-
-
-static int PrintMazeMeta(struct MazeCell c, uint_fast8_t row, char meta[6])
+static int PrintMazeMeta(const struct MazeCell *cell, uint_fast8_t row, char meta[6])
 {
     if (row == 0) {
         static const char dirchars[4] = {'^', '<', 'v', '>'};
-        const char d = dirchars[direction];
+        const char d = dirchars[pose.direction];
 
-        return snprintf(meta, 6, "%d%d%c", c.x, c.y,
-                c.x == cell.x && c.y == cell.y ? d : ' ');
+        return snprintf(meta, 6, "%d%d%c", cell->x, cell->y, Maze_CellsMatch(cell, &pose.cell) ? d : ' ');
     }
     else if (row == 1) {
-        return snprintf(meta, 6, "%d", Floodfill_GetDistance(c));
+        return snprintf(meta, 6, "%d", Floodfill_GetDistance(cell));
     }
     return 0;
 }
 
-static void UpdateWalls(void)
+static void UpdateWalls(const struct Pose *p)
 {
     struct SensorsWalls walls;
     Sensors_ReadWalls(&walls);
     bool success = true;
 
     if (walls.front) {
-        Maze_AddWallRelative(cell, direction, MAZE_UP);
-        success &= Floodfill_RecomputeFromCell(cell);
+        Maze_AddWallRelative(&p->cell, p->direction, MAZE_UP);
+        success &= Floodfill_RecomputeFromCell(&p->cell);
     }
     if (walls.left) {
-        Maze_AddWallRelative(cell, direction, MAZE_LEFT);
-        success &= Floodfill_RecomputeFromCell(cell);
+        Maze_AddWallRelative(&p->cell, p->direction, MAZE_LEFT);
+        success &= Floodfill_RecomputeFromCell(&p->cell);
     }
     if (walls.right) {
-        Maze_AddWallRelative(cell, direction, MAZE_RIGHT);
-        success &= Floodfill_RecomputeFromCell(cell);
+        Maze_AddWallRelative(&p->cell, p->direction, MAZE_RIGHT);
+        success &= Floodfill_RecomputeFromCell(&p->cell);
     }
 
     if (!success) {
@@ -90,13 +91,18 @@ static void UpdateWalls(void)
     }
 }
 
+static void UpdateWallsCallback(void)
+{
+    UpdateWalls(&pose);
+}
+
 /* На старте нас ставят в центр ячейки. Мы должны сдать назад на такое расстояние (лучше с запасом),
  * чтобы жопой гарантированно упереться и отперпендикуляриться о заднюю стенку ячейки.
  * Затем двинуться вперёд, выйти на крейсерскую скорость и в районе граничной линии перейти в состояние RUNNING.
  * Далее выполняем штатное движение по лабиринту. */
-static void OnStart(void)
+static void OnStart(struct Pose *p)
 {
-    Maneuver_BindDisposableBacktrimCallback(UpdateWalls);
+    Maneuver_BindDisposableBacktrimCallback(UpdateWallsCallback);
     ManeuverStatus maneuverStatus = Maneuver_Perform(Maneuver_BTR2M, 1); // Стены проверяются когда упёрлись в зад
 
     if (maneuverStatus != ManeuverStatus_COMPLETED || routerState != RouterState_STARTING) {
@@ -104,8 +110,8 @@ static void OnStart(void)
         return;
     }
 
-    cell = Maze_GetNeighbor(cell, direction);
-    routerState = Floodfill_GetDistance(cell) == 0 ? RouterState_FINISHING : RouterState_RUNNING;
+    Maze_GetNeighbor(&p->cell, &p->cell, p->direction);
+    routerState = Floodfill_GetDistance(&p->cell) == 0 ? RouterState_FINISHING : RouterState_RUNNING;
 }
 
 /* Штатное движение по лабиринту. Происходит между точками принятия решений.
@@ -123,22 +129,25 @@ static void OnStart(void)
  * Если ячейка, в которую сейчас смотрим, есть целевая ячейка, то переходим в состояние FINISHING.
  * Если предстоит повернуть, а до этого поворачивали уже MAX_CONSECUTIVE_TURNS раз подряд, то вместо поворота по дуге
  * выравниваемся жопой об стену, если она есть. */
-static void OnDecisionPoint(void)
+static void OnDecisionPoint(struct Pose *p)
 {
-    UpdateWalls();
+    static unsigned consecutiveTurns = 0;
+
+    UpdateWalls(p);
     if (routerState != RouterState_RUNNING)
         return;
 
-    struct MazeCell nextCell = Floodfill_NextCell(cell);
-    unsigned nextCellDirection = Maze_GetDirection(cell, nextCell); // с какой стороны сл. ячейка от текущей
-    unsigned nextMoveDirection = Maze_GetRelativeDirection(direction, nextCellDirection);
+    struct MazeCell nextCell;
+    Floodfill_NextCell(&nextCell, &p->cell);
+    unsigned nextCellDirection = Maze_GetDirection(&p->cell, &nextCell); // с какой стороны сл. ячейка от текущей
+    unsigned nextMoveDirection = Maze_GetRelativeDirection(p->direction, nextCellDirection);
     enum Maneuver maneuver = MANEUVERS[nextMoveDirection];
     ManeuverStatus maneuverStatus;
 
     if (maneuver == Maneuver_LS90 || maneuver == Maneuver_RS90) {
         consecutiveTurns++;
-        bool haveWallToTrim = (maneuver == Maneuver_LS90 && Maze_CellHasWallOnSide(cell, direction, MAZE_RIGHT))
-                           || (maneuver == Maneuver_RS90 && Maze_CellHasWallOnSide(cell, direction, MAZE_LEFT));
+        bool haveWallToTrim = (maneuver == Maneuver_LS90 && Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_RIGHT))
+                           || (maneuver == Maneuver_RS90 && Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_LEFT));
 
         if (consecutiveTurns > MAX_CONSECUTIVE_TURNS && haveWallToTrim) {
             maneuverStatus = Maneuver_Perform(Maneuver_HFWD, 0);
@@ -166,10 +175,10 @@ static void OnDecisionPoint(void)
         return;
     }
 
-    cell = nextCell;
-    direction = nextCellDirection;
+    p->cell = nextCell;
+    p->direction = nextCellDirection;
 
-    if (Floodfill_GetDistance(cell) == 0) {
+    if (Floodfill_GetDistance(&p->cell) == 0) {
         routerState = RouterState_FINISHING;
     }
 }
@@ -177,20 +186,20 @@ static void OnDecisionPoint(void)
 /* Когда морда смотрит на целевую ячейку, надо затормозить до её центра, затем развернуться, отперпендикуляриться
  * и перейти в состояние IDLE. Если в целевой ячейке нет передней стены, значит это 4-х клеточная зона финиша
  * и надо проехать ещё одну ячейку. */
-static void OnTargetReached(void)
+static void OnTargetReached(struct Pose *p)
 {
     ManeuverStatus maneuverStatus;
-    UpdateWalls();
+    UpdateWalls(p);
     if (routerState != RouterState_FINISHING)
         return;
 
-    if (!Maze_CellHasWallOnSide(cell, direction, MAZE_UP)) {
+    if (!Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_UP)) {
         if ((maneuverStatus = Maneuver_Perform(Maneuver_FWD, 1)) != ManeuverStatus_COMPLETED) {
             routerState = RouterState_FAILED;
             return;
         }
-        cell = Maze_GetNeighbor(cell, direction);
-        UpdateWalls();
+        Maze_GetNeighbor(&p->cell, &p->cell, p->direction);
+        UpdateWalls(p);
         if (routerState != RouterState_FINISHING)
             return;
     }
@@ -203,30 +212,30 @@ static void OnTargetReached(void)
         return;
     }
 
-    direction = Maze_GetOppositeDirection(direction);
+    p->direction = Maze_GetOppositeDirection(p->direction);
     routerState = RouterState_IDLE;
 }
 
-static void Spin(void)
+static void Search(void)
 {
     static bool msgPrint = false;
 
     switch (routerState) {
         case RouterState_STARTING:
-            OnStart();
+            OnStart(&pose);
             break;
 
         case RouterState_RUNNING:
-            OnDecisionPoint();
+            OnDecisionPoint(&pose);
             break;
 
         case RouterState_FINISHING:
-            OnTargetReached();
+            OnTargetReached(&pose);
             break;
 
         default:
             if (!msgPrint) {
-                printf("Stuck at routerState %d in cell %d,%d\n", routerState, cell.x, cell.y);
+                printf("Stuck at routerState %d in cell %d,%d\n", routerState, pose.cell.x, pose.cell.y);
                 msgPrint = true;
             }
             break;
@@ -237,34 +246,32 @@ void Router_Setup(void)
 {
     Maze_SetDimensions(params.mazeN, params.mazeM);
 
-    cell = params.startCell;
-    direction = params.startDirection;
+    pose = params.startPose;
 }
 
 void Router_ChangeStartDirection(void)
 {
-    params.startDirection = params.startDirection == MAZE_UP ? MAZE_RIGHT : MAZE_UP;
-    direction = params.startDirection;
+    params.startPose.direction = params.startPose.direction == MAZE_UP ? MAZE_RIGHT : MAZE_UP;
 }
 
 void Router_TargetFinish(void)
 {
-    Floodfill_Setup(params.goalCell, params.extendGoal);
+    Floodfill_Setup(&params.goalCell, params.extendGoal);
 }
 
 void Router_TargetStart(void)
 {
-    Floodfill_Setup(params.startCell, false);
+    Floodfill_Setup(&params.startPose.cell, false);
 }
 
 bool Router_RunSearch(void)
 {
     routerState = RouterState_STARTING;
     Maneuver_SetMode(ManeuverMode_SEARCH);
-    printf("Starting from cell %d,%d dir %d\n", cell.x, cell.y, direction);
+    printf("Starting from cell %d,%d dir %d\n", pose.cell.x, pose.cell.y, pose.direction);
 
     do {
-        Spin();
+        Search();
 
         if (routerState == RouterState_FAILED) {
             Fan_Off();
@@ -272,62 +279,61 @@ bool Router_RunSearch(void)
         }
     } while (routerState != RouterState_IDLE);
 
-    printf("Reached cell %d,%d dir %d\n", cell.x, cell.y, direction);
+    printf("Reached cell %d,%d dir %d\n", pose.cell.x, pose.cell.y, pose.direction);
     Maze_Print(PrintMazeMeta);
     return true;
 }
 
-static int BuildOrthoRoute(void)
+static int BuildOrthoRoute(struct Route *r)
 {
-    // cell = startCell; direction = startDirection
-    memset(route, Maneuver_NONE, MAX_ROUTE_LEN);
+    struct Pose p = params.startPose;
+    memset(r->mnvs, Maneuver_NONE, MAX_ROUTE_LEN);
+    memset(r->dashes, 0, sizeof(r->dashes[0]) * MAX_DASHES);
 
     // Backtrim & Start
-    route[0] = Maneuver_BTR2M;
-    cell = Maze_GetNeighbor(cell, direction);
-    routeLen = 1;
+    r->mnvs[0] = Maneuver_BTR2M;
+    Maze_GetNeighbor(&p.cell, &p.cell, p.direction);
+    r->len = 1;
 
     struct MazeCell nextCell;
     unsigned nextCellDirection, nextMoveDirection;
     enum Maneuver maneuver;
 
-    while (Floodfill_GetDistance(cell) != 0) {
-        nextCell = Floodfill_NextCell(cell);
-        nextCellDirection = Maze_GetDirection(cell, nextCell);
-        nextMoveDirection = Maze_GetRelativeDirection(direction, nextCellDirection);
+    while (Floodfill_GetDistance(&p.cell) != 0) {
+        Floodfill_NextCell(&nextCell, &p.cell);
+        nextCellDirection = Maze_GetDirection(&p.cell, &nextCell);
+        nextMoveDirection = Maze_GetRelativeDirection(p.direction, nextCellDirection);
         maneuver = MANEUVERS[nextMoveDirection];
 
         if (maneuver == MANEUVERS[MAZE_DOWN]) {
             return -1;
         }
-        if (routeLen + 1 > MAX_ROUTE_LEN) {
+        if (r->len + 1 > MAX_ROUTE_LEN) {
             return -2;
         }
 
-        route[routeLen++] = maneuver;
-        cell = nextCell;
-        direction = nextCellDirection;
+        r->mnvs[r->len++] = maneuver;
+        p.cell = nextCell;
+        p.direction = nextCellDirection;
     }
 
     if (params.extendGoal) {
-        if (routeLen + 1 > MAX_ROUTE_LEN) {
+        if (r->len + 1 > MAX_ROUTE_LEN) {
             return -2;
         }
-        route[routeLen++] = Maneuver_FWD;
-        cell = Maze_GetNeighbor(cell, direction);
+        r->mnvs[r->len++] = Maneuver_FWD;
+        Maze_GetNeighbor(&p.cell, &p.cell, p.direction);
     }
 
-    if (routeLen + 2 > MAX_ROUTE_LEN) {
+    if (r->len + 2 > MAX_ROUTE_LEN) {
         return -2;
     }
-    route[routeLen++] = Maneuver_HFWD;
-    route[routeLen++] = Maneuver_TBACK;
-    direction = Maze_GetOppositeDirection(direction);
-
-    return 0;
+    r->mnvs[r->len++] = Maneuver_HFWD;
+    r->mnvs[r->len++] = Maneuver_TBACK;
+    return Maze_GetOppositeDirection(p.direction);
 }
 
-enum DiagonalizerState {
+typedef enum {
     DiagonalizerState_S1,
     DiagonalizerState_S2,
     DiagonalizerState_DL45V1,
@@ -336,148 +342,147 @@ enum DiagonalizerState {
     DiagonalizerState_DR45V2,
     DiagonalizerState_DL135,
     DiagonalizerState_DR135
-};
+} DiagonalizerState;
 
-static int AppendDiagonalManeuver(uint8_t newRoute[], int idx,
-                                  enum DiagonalizerState *state, enum Maneuver nextManeuver)
+static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState *state, uint8_t nextOldMnv)
 {
     switch (*state) {
         case DiagonalizerState_S1:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx++] = Maneuver_FWD;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FWD;
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                newRoute[idx++] = Maneuver_HFWD;
-                newRoute[idx++] = Maneuver_SDL45;
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_HFWD;
+                newMnvs[idx++] = Maneuver_SDL45;
                 *state = DiagonalizerState_DL45V1;
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                newRoute[idx++] = Maneuver_HFWD;
-                newRoute[idx++] = Maneuver_SDR45;
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_HFWD;
+                newMnvs[idx++] = Maneuver_SDR45;
                 *state = DiagonalizerState_DR45V1;
             }
             break;
 
         case DiagonalizerState_S2:
-            if (nextManeuver == Maneuver_FWD) {
+            if (nextOldMnv == Maneuver_FWD) {
                 static bool alreadySkipped = false;
 
-                if (newRoute[idx - 1] == Maneuver_BTR2C) {
-                    newRoute[idx - 1] = Maneuver_BTR2M;
+                if (newMnvs[idx - 1] == Maneuver_BTR2C) {
+                    newMnvs[idx - 1] = Maneuver_BTR2M;
                     *state = DiagonalizerState_S1;
                 }
-                else if ((newRoute[idx - 1] == Maneuver_FDL135 || newRoute[idx - 1] == Maneuver_FDR135)
+                else if ((newMnvs[idx - 1] == Maneuver_FDL135 || newMnvs[idx - 1] == Maneuver_FDR135)
                          && !alreadySkipped) {
                     alreadySkipped = true;
                 }
                 else {
-                    newRoute[idx++] = Maneuver_HFWD;
+                    newMnvs[idx++] = Maneuver_HFWD;
                     *state = DiagonalizerState_S1;
                     alreadySkipped = false;
                 }
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                if (newRoute[idx - 1] == Maneuver_FDR135) {
-                    newRoute[idx-- - 2] = Maneuver_D2DR;
+            else if (nextOldMnv == Maneuver_LS90) {
+                if (newMnvs[idx - 1] == Maneuver_FDR135) {
+                    newMnvs[idx-- - 2] = Maneuver_D2DR;
                     *state = DiagonalizerState_DL45V1;
                 }
                 else {
-                    newRoute[idx++] = Maneuver_SDL45;
+                    newMnvs[idx++] = Maneuver_SDL45;
                     *state = DiagonalizerState_DL45V1;
                 }
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                if (newRoute[idx - 1] == Maneuver_FDL135) {
-                    newRoute[idx-- - 2] = Maneuver_D2DL;
+            else if (nextOldMnv == Maneuver_RS90) {
+                if (newMnvs[idx - 1] == Maneuver_FDL135) {
+                    newMnvs[idx-- - 2] = Maneuver_D2DL;
                     *state = DiagonalizerState_DR45V1;
                 }
                 else {
-                    newRoute[idx++] = Maneuver_SDR45;
+                    newMnvs[idx++] = Maneuver_SDR45;
                     *state = DiagonalizerState_DR45V1;
                 }
             }
             break;
 
         case DiagonalizerState_DL45V1:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx++] = Maneuver_FDL45;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FDL45;
                 *state = DiagonalizerState_S2;
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                newRoute[idx - 1] = Maneuver_SDL135;
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx - 1] = Maneuver_SDL135;
                 *state = DiagonalizerState_DL135;
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                newRoute[idx++] = Maneuver_DFWD;
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
                 *state = DiagonalizerState_DL45V2;
             }
             break;
 
         case DiagonalizerState_DL45V2:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx++] = Maneuver_FDR45;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FDR45;
                 *state = DiagonalizerState_S2;
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                newRoute[idx++] = Maneuver_DFWD;
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
                 *state = DiagonalizerState_DL45V1;
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                newRoute[idx++] = Maneuver_FDR135;
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_FDR135;
                 *state = DiagonalizerState_S2;
             }
             break;
 
         case DiagonalizerState_DR45V1:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx++] = Maneuver_FDR45;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FDR45;
                 *state = DiagonalizerState_S2;
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                newRoute[idx++] = Maneuver_DFWD;
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
                 *state = DiagonalizerState_DR45V2;
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                newRoute[idx - 1] = Maneuver_SDR135;
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx - 1] = Maneuver_SDR135;
                 *state = DiagonalizerState_DR135;
             }
             break;
 
         case DiagonalizerState_DR45V2:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx++] = Maneuver_FDL45;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FDL45;
                 *state = DiagonalizerState_S2;
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                newRoute[idx++] = Maneuver_FDL135;
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_FDL135;
                 *state = DiagonalizerState_S2;
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                newRoute[idx++] = Maneuver_DFWD;
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
                 *state = DiagonalizerState_DR45V1;
             }
             break;
 
         case DiagonalizerState_DL135:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx - 2] = newRoute[idx - 2] == Maneuver_HFWD ? Maneuver_FWD : Maneuver_BTR2M;
-                newRoute[idx - 1] = Maneuver_LS180;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx - 2] = newMnvs[idx - 2] == Maneuver_HFWD ? Maneuver_FWD : Maneuver_BTR2M;
+                newMnvs[idx - 1] = Maneuver_LS180;
                 *state = DiagonalizerState_S1;
             }
-            else if (nextManeuver == Maneuver_RS90) {
-                newRoute[idx++] = Maneuver_DFWD;
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
                 *state = DiagonalizerState_DL45V2;
             }
             break;
 
         case DiagonalizerState_DR135:
-            if (nextManeuver == Maneuver_FWD) {
-                newRoute[idx - 2] = newRoute[idx - 2] == Maneuver_HFWD ? Maneuver_FWD : Maneuver_BTR2M;
-                newRoute[idx - 1] = Maneuver_RS180;
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx - 2] = newMnvs[idx - 2] == Maneuver_HFWD ? Maneuver_FWD : Maneuver_BTR2M;
+                newMnvs[idx - 1] = Maneuver_RS180;
                 *state = DiagonalizerState_S1;
             }
-            else if (nextManeuver == Maneuver_LS90) {
-                newRoute[idx++] = Maneuver_DFWD;
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
                 *state = DiagonalizerState_DR45V2;
             }
             break;
@@ -485,128 +490,131 @@ static int AppendDiagonalManeuver(uint8_t newRoute[], int idx,
     return idx;
 }
 
-static int DiagonalizeRoute(uint8_t newRoute[])
+static int DiagonalizeRoute(uint8_t newMnvs[], const uint8_t oldMnvs[], unsigned oldLen)
 {
-    newRoute[0] = Maneuver_BTR2C;
-    enum DiagonalizerState state = DiagonalizerState_S2;
-    int len = 1;
+    newMnvs[0] = Maneuver_BTR2C;
+    DiagonalizerState state = DiagonalizerState_S2;
+    int newLen = 1;
 
-    for (int i = 1; i < routeLen - 2; i++) {
-        if (len > i)
+    for (int i = 1; i < oldLen - 2; i++) {
+        if (newLen > i)
             return -1;
-        len = AppendDiagonalManeuver(newRoute, len, &state, route[i]);
+        newLen = AppendDiagonalManeuver(newMnvs, newLen, &state, oldMnvs[i]);
     }
-    len = AppendDiagonalManeuver(newRoute, len, &state, Maneuver_FWD);
+    newLen = AppendDiagonalManeuver(newMnvs, newLen, &state, Maneuver_FWD);
 
-    if (len + 2 > MAX_ROUTE_LEN)
+    if (newLen + 2 > MAX_ROUTE_LEN)
         return -2;
 
     if (state == DiagonalizerState_S1)
-        newRoute[len++] = Maneuver_HFWD;
-    newRoute[len++] = Maneuver_TBACK;
+        newMnvs[newLen++] = Maneuver_HFWD;
+    newMnvs[newLen++] = Maneuver_TBACK;
 
-    return len;
+    return newLen;
 }
 
-static int ShortcutStraights(uint8_t newRoute[])
+static int ShortcutStraights(uint8_t newMnvs[], uint16_t dashes[], const uint8_t oldMnvs[], unsigned oldLen)
 {
-    int idx = 0, len = 1, distance = 0;
+    int idx = 0, newLen = 1, distance = 0;
 
-    newRoute[0] = route[0];
+    newMnvs[0] = oldMnvs[0];
 
-    for (int i = 1; i < routeLen - 2; i++) {
-        if (route[i] == Maneuver_FWD && route[i + 1] == Maneuver_FWD) {
+    for (int i = 1; i < oldLen - 2; i++) {
+        if (oldMnvs[i] == Maneuver_FWD && oldMnvs[i + 1] == Maneuver_FWD) {
             if (distance == 0) {
                 distance = 360;
-                newRoute[len++] = Maneuver_DASH;
+                newMnvs[newLen++] = Maneuver_DASH;
             }
             else {
                 distance += 180;
             }
         }
-        else if (route[i] == Maneuver_DFWD && route[i + 1] == Maneuver_DFWD && route[i + 2] == Maneuver_DFWD) {
+        else if (oldMnvs[i] == Maneuver_DFWD && oldMnvs[i + 1] == Maneuver_DFWD && oldMnvs[i + 2] == Maneuver_DFWD) {
             if (distance == 0) {
                 distance = 381;
-                newRoute[len++] = Maneuver_DASH;
+                newMnvs[newLen++] = Maneuver_DASH;
             }
             else {
                 distance += 127;
             }
         }
         else {
-            if (distance) {
-                dashDistances[idx++] = distance;
+            if (distance != 0) {
+                dashes[idx++] = distance;
                 if (idx > MAX_DASHES)
                     return -1;
                 distance = 0;
             }
             else {
-                newRoute[len++] = route[i];
+                newMnvs[newLen++] = oldMnvs[i];
             }
         }
     }
-    newRoute[len++] = route[routeLen - 2];
-    newRoute[len++] = route[routeLen - 1];
+    newMnvs[newLen++] = oldMnvs[oldLen - 2];
+    newMnvs[newLen++] = oldMnvs[oldLen - 1];
 
-    return len;
+    return newLen;
 }
 
-static void PrintRoute(void)
+static void PrintRoute(const struct Route *r)
 {
-    printf("Route len: %d\n", routeLen);
-    for (int i = 0, j = 0; i < routeLen; i++) {
-        if (route[i] == Maneuver_DASH)
-            printf("%s_%d ", MANEUVERS_STR[route[i]], dashDistances[j++]);
+    printf("Route len: %d\n", r->len);
+    for (int i = 0, j = 0; i < r->len; i++) {
+        if (r->mnvs[i] == Maneuver_DASH)
+            printf("%s_%d ", MANEUVERS_STR[r->mnvs[i]], r->dashes[j++]);
         else
-            printf("%s ", MANEUVERS_STR[route[i]]);
+            printf("%s ", MANEUVERS_STR[r->mnvs[i]]);
     }
     printf("\n");
 }
 
 static int BuildRoute(void)
 {
-    int retcode = BuildOrthoRoute();
+    int goalDirection = BuildOrthoRoute(&route);
 
-    if (retcode < 0) {
-        printf("BuildOrtho err: %d\n", retcode);
+    if (goalDirection < 0) {
+        printf("BuildOrtho err: %d\n", goalDirection);
         return -1;
     }
 
     printf("Ortho\n");
-    PrintRoute();
+    PrintRoute(&route);
 
-    uint8_t newRoute[MAX_ROUTE_LEN];
+    uint8_t newMnvs[MAX_ROUTE_LEN];
 
-    int newRouteLen = DiagonalizeRoute(newRoute);
-    if (newRouteLen < 0) {
-        printf("Diagonalizer err: %d\n", newRouteLen);
+    int newMnvsLen = DiagonalizeRoute(newMnvs, route.mnvs, route.len);
+    if (newMnvsLen < 0) {
+        printf("Diagonalizer err: %d\n", newMnvsLen);
         return -1;
     }
 
-    memcpy(route, newRoute, newRouteLen);
-    routeLen = newRouteLen;
+    memcpy(route.mnvs, newMnvs, newMnvsLen);
+    route.len = newMnvsLen;
 
     printf("Diagonalized\n");
-    PrintRoute();
+    PrintRoute(&route);
 
-    newRouteLen = ShortcutStraights(newRoute);
-    if (newRouteLen < 0) {
-        printf("Shortcut err: %d\n", newRouteLen);
+    uint16_t dashes[MAX_DASHES];
+    newMnvsLen = ShortcutStraights(newMnvs, dashes, route.mnvs, route.len);
+    if (newMnvsLen < 0) {
+        printf("Shortcut err: %d\n", newMnvsLen);
         return -1;
     }
 
-    memcpy(route, newRoute, newRouteLen);
-    routeLen = newRouteLen;
+    memcpy(route.mnvs, newMnvs, newMnvsLen);
+    memcpy(route.dashes, dashes, sizeof(route.dashes[0]) * MAX_DASHES);
+    route.len = newMnvsLen;
 
     printf("Shortcut\n");
-    PrintRoute();
+    PrintRoute(&route);
 
-    return 0;
+    return goalDirection;
 }
 
 bool Router_RunFast(void)
 {
-    if (BuildRoute() < 0)
+    int goalDirection;
+    if ((goalDirection = BuildRoute()) < 0)
         return false;
 
     routerState = RouterState_RUNNING;
@@ -617,18 +625,20 @@ bool Router_RunFast(void)
     enum Maneuver maneuver;
     int dashIdx = 0;
 
-    for (int i = 0; i < routeLen; i++) {
-        maneuver = (enum Maneuver)route[i];
+    for (int i = 0; i < route.len; i++) {
+        maneuver = (enum Maneuver)route.mnvs[i];
         if (maneuver == Maneuver_DASH) {
-            Maneuver_SetupDash(dashDistances[dashIdx++]);
+            Maneuver_SetupDash(route.dashes[dashIdx++]);
         }
-        if (Maneuver_Perform(maneuver, i < routeLen - 2) != ManeuverStatus_COMPLETED) {
+        if (Maneuver_Perform(maneuver, i < route.len - 2) != ManeuverStatus_COMPLETED) {
             routerState = RouterState_FAILED;
             return false;
         }
     }
 
     Fan_Off();
+    pose.cell = params.goalCell;
+    pose.direction = goalDirection;
     Maze_Print(PrintMazeMeta);
     routerState = RouterState_IDLE;
 
@@ -660,9 +670,9 @@ static int execute(int argc, char *argv[])
         unsigned d = atoi(argv[3]) & 3;
 
         if (x < params.mazeN && y < params.mazeM) {
-            params.startCell.x = x;
-            params.startCell.y = y;
-            params.startDirection = d;
+            params.startPose.cell.x = x;
+            params.startPose.cell.y = y;
+            params.startPose.direction = d;
         }
         else
             return -2;
@@ -681,7 +691,8 @@ static int execute(int argc, char *argv[])
             return -2;
     }
     else if (!strcmp(argv[0], "pm")) {
-        struct MazeCell nextCell = Floodfill_NextCell(cell);
+        struct MazeCell nextCell;
+        Floodfill_NextCell(&nextCell, &pose.cell);
 
         Maze_Print(PrintMazeMeta);
         printf("Next: %d,%d\n", nextCell.x, nextCell.y);
@@ -689,8 +700,8 @@ static int execute(int argc, char *argv[])
     else if (!strcmp(argv[0], "aw") && argc == 2) {
         unsigned side = atoi(argv[1]) & 3;
 
-        Maze_AddWallRelative(cell, direction, side);
-        printf("Floodfill recomputed, %d\n", Floodfill_RecomputeFromCell(cell));
+        Maze_AddWallRelative(&pose.cell, pose.direction, side);
+        printf("Floodfill recomputed, %d\n", Floodfill_RecomputeFromCell(&pose.cell));
     }
     else if (!strcmp(argv[0], "rst")) {
         Router_Setup();
@@ -698,28 +709,28 @@ static int execute(int argc, char *argv[])
     }
     else if (!strcmp(argv[0], "n")) {
         if (routerState == RouterState_IDLE) {
-            if (cell.x == params.startCell.x && cell.y == params.startCell.y) {
+            if (Maze_CellsMatch(&pose.cell, &params.startPose.cell)) {
                 Maneuver_SetMode(ManeuverMode_SEARCH);
-                Floodfill_Setup(params.goalCell, params.extendGoal);
+                Floodfill_Setup(&params.goalCell, params.extendGoal);
                 routerState = RouterState_STARTING;
-                Spin();
+                Search();
             }
-            else if (cell.x == params.goalCell.x && cell.y == params.goalCell.y) {
+            else if (Maze_CellsMatch(&pose.cell, &params.goalCell)) {
                 Maneuver_SetMode(ManeuverMode_SEARCH);
-                Floodfill_Setup(params.startCell, false);
+                Floodfill_Setup(&params.startPose.cell, false);
                 routerState = RouterState_STARTING;
-                Spin();
+                Search();
             }
             else
                 printf("I shouldn't be here\n");
         }
         else {
-            Spin();
+            Search();
         }
         printf("Movement done\n");
     }
     else if (!strcmp(argv[0], "br")) {
-        Floodfill_Setup(params.goalCell, params.extendGoal);
+        Floodfill_Setup(&params.goalCell, params.extendGoal);
         BuildRoute();
     }
     else if (!strcmp(argv[0], "ps")) {
@@ -728,7 +739,7 @@ static int execute(int argc, char *argv[])
                "start x,y,d: %d,%d,%d\n"
                "goal x,y,e: %d,%d,%d\n",
                params.mazeN, params.mazeM,
-               params.startCell.x, params.startCell.y, params.startDirection,
+               params.startPose.cell.x, params.startPose.cell.y, params.startPose.direction,
                params.goalCell.x, params.goalCell.y, params.extendGoal);
     }
     else
