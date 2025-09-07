@@ -1,7 +1,9 @@
 #ifndef _INC_IMU_H
 #define _INC_IMU_H
 
-#include "module.h"
+#include <shell.h>
+#include <scheduler.h>
+#include <settings.h>
 
 struct IMU_Data {
     int16_t accelX;
@@ -24,6 +26,8 @@ void IMU_Calibrate(unsigned numIterations);
 void IMU_Update(void);
 void IMU_GetData(struct IMU_Data *data);
 
-extern struct Module IMU_module;
+extern struct SchedulerTask TASK_TmImu;
+extern const struct ShellCommand CMD_Imu;
+extern const struct Settings SETT_Imu;
 
 #endif // _INC_IMU_H

@@ -1,4 +1,5 @@
 #include "sensors.h"
+#include "mcu.h"
 #include "emitters.h"
 #include "receivers.h"
 #include "utils.h"
@@ -179,20 +180,18 @@ int32_t Sensors_GetSteeringError(void)
         return 0;
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
     struct SensorsDistance d;
     struct SensorsWalls w;
 
     if (telemetryMode == TelemetryMode_DISTANCES) {
         Sensors_ReadDistance(&d);
-        snprintf(out, TELEMETRY_STRING_SIZE, "LF:%-5ld\tLS:%-5ld\tRS:%-5ld\tRF:%-5ld\n",
-                d.leftFront, d.leftSide, d.rightSide, d.rightFront);
+        printf("LF:%-5ld\tLS:%-5ld\tRS:%-5ld\tRF:%-5ld\n", d.leftFront, d.leftSide, d.rightSide, d.rightFront);
     }
     else if (telemetryMode == TelemetryMode_WALLS) {
         Sensors_ReadWalls(&w);
-        snprintf(out, TELEMETRY_STRING_SIZE, "L:%-5d\tF:%-5d\tR:%-5d\n",
-                w.left, w.front, w.right);
+        printf("L:%-5d\tF:%-5d\tR:%-5d\n", w.left, w.front, w.right);
     }
 }
 
@@ -258,20 +257,18 @@ static void save(uint8_t *buffer)
     memcpy(buffer, &middle, sizeof(middle));
 }
 
-static struct ModuleSettings settings = {
+const struct Settings SETT_Sensors = {
     .dataSize = sizeof(threshold) + sizeof(calibValue) + sizeof(middle),
     .load = load,
     .save = save
 };
 
-static struct ModuleTelemetry telemetry = {
-    .interval = 300,
-    .write = WriteTelemetry
+struct SchedulerTask TASK_TmSensors = {
+    .execute = PrintTelemetry,
+    .period = 300
 };
 
-struct Module Sensors_module = {
+const struct ShellCommand CMD_Sensors = {
     .name = "sensors",
     .execute = execute,
-    .telemetry = &telemetry,
-    .settings = &settings
 };

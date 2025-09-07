@@ -1,5 +1,5 @@
-#ifndef _INC_UART_H
-#define _INC_UART_H
+#ifndef _INC_UART_IO_H
+#define _INC_UART_IO_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -11,4 +11,6 @@ bool UART_LineReceived(void);
 uint32_t UART_ReadLine(char *buff, uint32_t size);
 void UART_Flush(void);
 
-#endif // _INC_UART_H
+void UART_RxCallback(void);
+
+#endif // _INC_UART_IO_H

@@ -1,7 +1,10 @@
 #ifndef _INC_SPEEDCTL_H
 #define _INC_SPEEDCTL_H
 
-#include "module.h"
+#include <scheduler.h>
+#include <shell.h>
+#include <settings.h>
+
 #include "mcu.h"
 
 typedef enum {
@@ -20,6 +23,8 @@ void SpeedCtl_SetTarget(int32_t vTransInMmPerS, int32_t vRotInDegPerS);
 void SpeedCtl_GetSpeed(int32_t *vTransInMmPerS, int32_t *vRotInDegPerS);
 void SpeedCtl_Update(void);
 
-extern struct Module SpeedCtl_module;
+extern struct SchedulerTask TASK_TmSpeedCtl;
+extern const struct ShellCommand CMD_SpeedCtl;
+extern const struct Settings SETT_SpeedCtl;
 
 #endif // _INC_SPEEDCTL_H

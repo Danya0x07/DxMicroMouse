@@ -1,7 +1,10 @@
 #ifndef _INC_SENSORS_H
 #define _INC_SENSORS_H
 
-#include "module.h"
+#include <scheduler.h>
+#include <shell.h>
+#include <settings.h>
+
 #include "mcu.h"
 
 struct SensorsDistance {
@@ -27,6 +30,8 @@ bool Sensors_DetectTransition(void);
 
 int32_t Sensors_GetSteeringError(void);
 
-extern struct Module Sensors_module;
+extern struct SchedulerTask TASK_TmSensors;
+extern const struct ShellCommand CMD_Sensors;
+extern const struct Settings SETT_Sensors;
 
 #endif // _INC_SENSORS_H

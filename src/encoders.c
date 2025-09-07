@@ -1,6 +1,7 @@
 #include "encoders.h"
-#include <as5048.h>
 #include "mcu.h"
+#include <as5048.h>
+#include <stdio.h>
 #include <string.h>
 
 struct EncoderCounts current, previous, delta;
@@ -122,14 +123,13 @@ void Encoders_GetDelta(struct EncoderCounts *d)
     SysTick_EnableInterrupt();
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
     struct EncoderCounts c, d;
     Encoders_GetCounts(&c);
     Encoders_GetDelta(&d);
 
-    snprintf(out, TELEMETRY_STRING_SIZE,
-            "L:%-10ld\tR:%-10ld\tdL:%-10ld\tdR:%-10ld\n", c.left, c.right, d.left, d.right);
+    printf("L:%-10ld\tR:%-10ld\tdL:%-10ld\tdR:%-10ld\n", c.left, c.right, d.left, d.right);
 }
 
 static int execute(int argc, char *argv[])
@@ -143,13 +143,12 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static struct ModuleTelemetry telemetry = {
-    .interval = 350,
-    .write = WriteTelemetry
+struct SchedulerTask TASK_TmEncoders = {
+    .execute = PrintTelemetry,
+    .period = 350
 };
 
-struct Module Encoders_module = {
-    .name = "encoders",
-    .execute = execute,
-    .telemetry = &telemetry
+const struct ShellCommand CMD_Encoders = {
+    .name = "encs",
+    .execute = execute
 };

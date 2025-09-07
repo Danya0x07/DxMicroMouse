@@ -1,7 +1,9 @@
 #ifndef _INC_MANEUVER_H
 #define _INC_MANEUVER_H
 
-#include "module.h"
+#include <shell.h>
+#include <stdbool.h>
+#include <settings.h>
 
 typedef enum {
     ManeuverStatus_COMPLETED,
@@ -50,6 +52,7 @@ void Maneuver_BindDisposableBacktrimCallback(void (*callback)(void));
 ManeuverStatus Maneuver_Perform(enum Maneuver maneuver, bool keepSpeed);
 void Maneuver_Abort(void);
 
-extern struct Module Maneuver_module;
+extern const struct ShellCommand CMD_Maneuver;
+extern const struct Settings SETT_Maneuver;
 
 #endif // _INC_MANEUVER_H

@@ -1,7 +1,8 @@
 #ifndef _INC_BUZZER_H
 #define _INC_BUZZER_H
 
-#include "module.h"
+#include <stdint.h>
+#include <shell.h>
 
 void Buzzer_Blink(unsigned times, unsigned freq, unsigned duration);
 void Buzzer_Sing(uint16_t *freqs, unsigned len, unsigned duration);
@@ -20,6 +21,6 @@ void Buzzer_SingRunMode(void);
 void Buzzer_BeepManeuverCompleted();
 void Buzzer_BeepTurningBack(void);
 
-extern struct Module Buzzer_module;
+extern const struct ShellCommand CMD_Buzzer;
 
 #endif // _INC_BUZZER_H

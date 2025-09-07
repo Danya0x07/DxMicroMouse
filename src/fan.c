@@ -58,7 +58,7 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-struct Module Fan_module = {
+const struct ShellCommand CMD_Fan = {
     .name = "fan",
     .execute = execute
 };

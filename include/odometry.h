@@ -1,7 +1,9 @@
 #ifndef _INC_ODOMETRY_H
 #define _INC_ODOMETRY_H
 
-#include "module.h"
+#include <scheduler.h>
+#include <shell.h>
+#include <settings.h>
 
 #define COUNTS_PER_MM    63
 #define COUNTS_PER_CELL 11116
@@ -19,6 +21,8 @@ void Odometry_GetPrediction(int *distanceInMm, int *angleInDeg);
 
 void Odometry_GetFusion(int *distanceInMm, int *angleInDeg);
 
-extern struct Module Odometry_module;
+extern struct SchedulerTask TASK_TmOdometry;
+extern const struct ShellCommand CMD_Odometry;
+extern const struct Settings SETT_Odometry;
 
 #endif // _INC_ODOMETRY_H

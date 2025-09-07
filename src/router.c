@@ -762,14 +762,13 @@ static void save(uint8_t *buffer)
     Maze_SerializeWalls(buffer);
 }
 
-static struct ModuleSettings settings = {
+const struct Settings SETT_Router = {
     .dataSize = sizeof(params) + MAZEMAXLEN * MAZEMAXLEN / 2,
     .load = load,
     .save = save
 };
 
-struct Module Router_module = {
+const struct ShellCommand CMD_Router = {
     .name = "rt",
-    .execute = execute,
-    .settings = &settings
+    .execute = execute
 };

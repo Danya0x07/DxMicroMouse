@@ -1,15 +1,16 @@
 #include "button.h"
+#include "mcu.h"
 
 bool Button_IsPressed(void)
 {
     return GPIO_ReadInputDataBit(BUTTON_GPIO, BUTTON_PIN) == 0;
 }
 
-ButtonEvent_t Button_GetEvent(void)
+ButtonEvent Button_GetEvent(void)
 {
     static bool prevState = 0;
     static uint32_t prevCheckTime = 0;
-    ButtonEvent_t event = ButtonEvent_NOTHING;
+    ButtonEvent event = ButtonEvent_NOTHING;
     bool state = Button_IsPressed();
 
     if (state != prevState && Millis_Get() - prevCheckTime > 10) {
@@ -26,30 +27,3 @@ ButtonEvent_t Button_GetEvent(void)
 
     return event;
 }
-
-//~ ButtonEvent_t Button_GetNextEvent(void)
-//~ {
-    //~ ButtonEvent_t event = ButtonEvent_NOTHING;
-
-    //~ for (int i = 0; i < 200; i++) {
-        //~ Micros_Wait(1000);
-        //~ if (event == ButtonEvent_NOTHING)
-            //~ event = Button_GetEvent();
-        //~ else if (event == ButtonEvent_RELEASE && Button_GetEvent() == ButtonEvent_PRESS) {
-            //~ event = ButtonEvent_PRESS;
-            //~ break;
-        //~ }
-    //~ }
-    //~ return event;
-//~ }
-
-//~ void Button_EnableInterrupt(void)
-//~ {
-    //~ EXTI_ClearITPendingBit(EXTI_Line1);
-    //~ NVIC_EnableIRQ(EXTI1_IRQn);
-//~ }
-
-//~ void Button_DisableInterrupt(void)
-//~ {
-    //~ NVIC_DisableIRQ(EXTI1_IRQn);
-//~ }

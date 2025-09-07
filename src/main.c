@@ -1,35 +1,67 @@
 #include "mcu.h"
-#include "uart.h"
 #include "leds.h"
 #include "button.h"
 #include "buzzer.h"
 #include "motors.h"
 #include "fan.h"
 #include "sensors.h"
-#include "shell.h"
 #include "imu.h"
 #include "encoders.h"
-#include "memory.h"
 #include "battery.h"
 #include "speedctl.h"
 #include "odometry.h"
 #include "motion.h"
 #include "maneuver.h"
+#include "memory.h"
 #include "router.h"
+#include "telemetry.h"
 
-struct Module *modules[] = {
-    &Sensors_module,
-    &IMU_module,
-    &Motors_module,
-    &Fan_module,
-    &Encoders_module,
-    &Memory_module,
-    &Battery_module,
-    &SpeedCtl_module,
-    &Odometry_module,
-    &Buzzer_module,
-    &Maneuver_module,
-    &Router_module,
+#include <uart_io.h>
+#include <shell.h>
+#include <scheduler.h>
+#include <settings.h>
+
+static int PrintSettingsMemory(int argc, char *argv[]);
+static int SaveSettings(int argc, char *argv[]);
+
+static const struct ShellCommand *const shellCommands[] = {
+    &CMD_Buzzer,
+    &CMD_Encoders,
+    &CMD_Fan,
+    &CMD_Imu,
+    &CMD_Maneuver,
+    &CMD_Motors,
+    &CMD_Odometry,
+    &CMD_Router,
+    &CMD_Sensors,
+    &CMD_SpeedCtl,
+    &CMD_Telemetry,
+    &(struct ShellCommand){.name = "mem", .execute = PrintSettingsMemory},
+    &(struct ShellCommand){.name = "ss", .execute = SaveSettings},
+    NULL
+};
+
+struct SchedulerTask *const schedulerTasks[] = {
+    &TASK_TmBattery,
+    &TASK_TmEncoders,
+    &TASK_TmImu,
+    &TASK_TmMotors,
+    &TASK_TmOdometry,
+    &TASK_TmSensors,
+    &TASK_TmSpeedCtl,
+    NULL
+};
+const char *const taskNames[sizeof(schedulerTasks) / sizeof(schedulerTasks[0]) - 1] = {
+    "bat", "encs", "imu", "mot", "odom", "sens", "spctl"
+};
+
+static const struct Settings *const settings[] = {
+    &SETT_Imu,
+    &SETT_Maneuver,
+    &SETT_Odometry,
+    &SETT_Router,
+    &SETT_Sensors,
+    &SETT_SpeedCtl,
     NULL
 };
 
@@ -40,8 +72,10 @@ static void InitModules(void)
     int retcode;
 
     if (!Button_IsPressed()) {
-        if ((retcode = Modules_LoadSettings()) < 0)
+        if ((retcode = Settings_Load(settings)) != SETTINGS_OK) {
+            printf("Settings err: %d\n", retcode);
             Buzzer_BlinkInitError(1);
+        }
     }
     else {
         printf("Skip loading settings\n");
@@ -156,14 +190,15 @@ static void executeSetupMode(void)
 
     if (GetPress(10)) {
         Router_EraseMaze();
-        Modules_SaveSettings();
+        Settings_Save(settings);
         printf("Maze erased from RAM\n");
         Buzzer_SingErazeMaze();
     }
     Router_Setup();
 
     for (;;) {
-        Shell_Spin();
+        Shell_Spin(shellCommands);
+        Scheduler_SpinRegular(schedulerTasks);
         if (Button_GetEvent() == ButtonEvent_PRESS) {
             if (SpeedCtl_GetState() == ENABLE || Sensors_GetState() == ENABLE || Fan_IsOn()) {
                 StopActivity();
@@ -202,11 +237,11 @@ static void executeRunMode(void)
 
         if (success) {
             ShowHappiness();
-            Modules_SaveSettings();  // to save known maze
+            SaveSettings(0, NULL);
             Router_TargetStart();
             success = Router_RunSearch();
             if (success)
-                Modules_SaveSettings();  // to save known maze
+                SaveSettings(0, NULL);
             else
                 break;
         }
@@ -223,6 +258,7 @@ int main(void)
 {
     MCU_Init();
     Sensors_SetState(DISABLE);
+    Scheduler_Setup(schedulerTasks);
     LED0_Blink(2, 150);
     printf("\nDxMicroMouse mk1 Firmware " FIRMWARE_VERSION "\n");
 
@@ -251,13 +287,26 @@ void SysTick_Handler(void)
     SysTick_Reset();
 
     Sensors_Update();
-    MEMORY_HOLD_TRANSACTION();
     Encoders_Update();
     IMU_Update();
-    MEMORY_UNHOLD_TRANSACTION();
     Battery_Update();
     Buzzer_Update();
 
     Motion_Update();
     SpeedCtl_Update();
+}
+
+static int PrintSettingsMemory(int argc, char *argv[])
+{
+    uint8_t buffer[MEMORY_SIZE];
+    Settings_Export(buffer);
+    for (int i = 0; i < MEMORY_SIZE; i++)
+        UART_SendChar(buffer[i]);
+    return 0;
+}
+
+static int SaveSettings(int argc, char *argv[])
+{
+    printf("Settings save ret: %d\n", Settings_Save(settings));
+    return 0;
 }

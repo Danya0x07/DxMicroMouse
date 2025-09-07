@@ -1,9 +1,8 @@
 #include "imu.h"
 #include "mcu.h"
 #include "leds.h"
-#include <mpu6500.h>
 
-#include <stdlib.h>
+#include <mpu6500.h>
 #include <string.h>
 
 #define CALIB_BUFFSIZE  1000
@@ -315,22 +314,16 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
     struct IMU_Data imuData;
     IMU_GetData(&imuData);
 
-    snprintf(out, TELEMETRY_STRING_SIZE,
-        "gX:%-5d\tgY:%-5d\tgZ:%-5d\taX:%-5d\taY:%-5d\taZ:%-5d\n",
+    printf("gX:%-5d\tgY:%-5d\tgZ:%-5d\taX:%-5d\taY:%-5d\taZ:%-5d\n",
         imuData.gyroX, imuData.gyroY, imuData.gyroZ,
         imuData.accelX, imuData.accelY, imuData.accelZ
     );
 }
-
-static struct ModuleTelemetry telemetry = {
-    .interval = 200,
-    .write = WriteTelemetry
-};
 
 static void load(const uint8_t *buffer)
 {
@@ -342,15 +335,17 @@ static void save(uint8_t *buffer)
     memcpy(buffer, &sensorOffset, sizeof(sensorOffset));
 }
 
-static struct ModuleSettings settings = {
+struct SchedulerTask TASK_TmImu = {
+    .execute = PrintTelemetry,
+    .period = 200
+};
+const struct ShellCommand CMD_Imu = {
+    .name = "imu",
+    .execute = execute
+};
+
+const struct Settings SETT_Imu = {
     .dataSize = sizeof(sensorOffset),
     .load = load,
     .save = save
-};
-
-struct Module IMU_module = {
-    .name = "imu",
-    .execute = execute,
-    .telemetry = &telemetry,
-    .settings = &settings
 };

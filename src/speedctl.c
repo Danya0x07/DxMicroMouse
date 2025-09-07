@@ -1,10 +1,12 @@
 #include "speedctl.h"
+#include "mcu.h"
 #include "sensors.h"
 #include "motors.h"
 #include "encoders.h"
 #include "imu.h"
 #include "regulator.h"
 #include "odometry.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -232,27 +234,19 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
     if (telemetryMode == TelemetryMode_VTRANS) {
-        snprintf(out, TELEMETRY_STRING_SIZE,
-            "tgtV: %ld\tv: %ld\n",
-            targetVTransInTpS,
-            vTransInTpS
-        );
+        printf("tgtV: %ld\tv: %ld\n", targetVTransInTpS, vTransInTpS);
     }
     else {
-        snprintf(out, TELEMETRY_STRING_SIZE,
-            "tgtW: %ld\tw: %ld\n",
-            targetVRotInLsbs,
-            vRotInLsbs
-        );
+        printf("tgtW: %ld\tw: %ld\n", targetVRotInLsbs, vRotInLsbs);
     }
 }
 
-static struct ModuleTelemetry telemetry = {
-    .interval = 200,
-    .write = WriteTelemetry
+struct SchedulerTask TASK_TmSpeedCtl = {
+    .execute = PrintTelemetry,
+    .period = 200
 };
 
 static void load(const uint8_t *buffer)
@@ -265,15 +259,13 @@ static void save(uint8_t *buffer)
     memcpy(buffer, &params, sizeof(params));
 }
 
-static struct ModuleSettings settings = {
+const struct Settings SETT_SpeedCtl = {
     .dataSize = sizeof(params),
     .load = load,
     .save = save
 };
 
-struct Module SpeedCtl_module = {
+const struct ShellCommand CMD_SpeedCtl = {
     .name = "spctl",
-    .execute = execute,
-    .telemetry = &telemetry,
-    .settings = &settings
+    .execute = execute
 };

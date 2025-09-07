@@ -108,17 +108,17 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
     int distance, angle;
 
     Odometry_GetFusion(&distance, &angle);
-    snprintf(out, TELEMETRY_STRING_SIZE, "d: %d\tang: %d\n", distance, angle);
+    printf("d: %d\tang: %d\n", distance, angle);
 }
 
-static struct ModuleTelemetry telemetry = {
-    .interval = 250,
-    .write = WriteTelemetry
+struct SchedulerTask TASK_TmOdometry = {
+    .execute = PrintTelemetry,
+    .period = 250
 };
 
 static void load(const uint8_t *buffer)
@@ -131,15 +131,13 @@ static void save(uint8_t *buffer)
     memcpy(buffer, &coeffAlpha, sizeof(coeffAlpha));
 }
 
-static struct ModuleSettings settings = {
+const struct Settings SETT_Odometry = {
     .dataSize = sizeof(coeffAlpha),
     .load = load,
     .save = save
 };
 
-struct Module Odometry_module = {
+const struct ShellCommand CMD_Odometry = {
     .name = "odom",
-    .execute = execute,
-    .telemetry = &telemetry,
-    .settings = &settings
+    .execute = execute
 };

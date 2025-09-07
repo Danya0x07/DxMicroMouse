@@ -1,7 +1,7 @@
 #ifndef _INC_BATTERY_H
 #define _INC_BATTERY_H
 
-#include "module.h"
+#include <scheduler.h>
 
 typedef enum {
     BatteryStatus_DEAD = 0,
@@ -15,6 +15,6 @@ void Battery_Update(void);
 BatteryStatus Battery_GetStatus(void);
 const char *Battery_StatusToStr(BatteryStatus status);
 
-extern struct Module Battery_module;
+extern struct SchedulerTask TASK_TmBattery;
 
 #endif // _INC_BATTERY_H

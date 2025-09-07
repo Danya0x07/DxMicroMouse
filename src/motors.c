@@ -1,5 +1,7 @@
 #include "motors.h"
 #include "mcu.h"
+
+#include <stdio.h>
 #include <stdlib.h>
 
 static int ConstrainPwm(int pwm)
@@ -56,21 +58,20 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
     int pwmLeft, pwmRight;
 
     Motors_GetPwm(&pwmLeft, &pwmRight);
-    snprintf(out, TELEMETRY_STRING_SIZE, "L:%d\tR:%d\n", pwmLeft, pwmRight);
+    printf("L:%d\tR:%d\n", pwmLeft, pwmRight);
 }
 
-static struct ModuleTelemetry telemetry = {
-    .interval = 50,
-    .write = WriteTelemetry
+struct SchedulerTask TASK_TmMotors = {
+    .execute = PrintTelemetry,
+    .period = 50
 };
 
-struct Module Motors_module = {
-    .name = "motors",
-    .execute = execute,
-    .telemetry = &telemetry
+const struct ShellCommand CMD_Motors = {
+    .name = "mot",
+    .execute = execute
 };

@@ -135,7 +135,7 @@ static int execute(int argc, char *argv[])
     return 0;
 }
 
-struct Module Buzzer_module = {
+const struct ShellCommand CMD_Buzzer = {
     .name = "bz",
-    .execute = execute,
+    .execute = execute
 };

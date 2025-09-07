@@ -1,0 +1,6 @@
+#ifndef _INC_SETTINGS_CONF_H
+#define _INC_SETTINGS_CONF_H
+
+#define MEMORY_SIZE  384
+
+#endif // _INC_SETTINGS_CONF_H

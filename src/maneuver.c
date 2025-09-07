@@ -674,14 +674,13 @@ static void save(uint8_t *buffer)
     memcpy(buffer, configs, sizeof(configs));
 }
 
-static struct ModuleSettings settings = {
+const struct Settings SETT_Maneuver = {
     .dataSize = sizeof(configs),
     .load = load,
     .save = save
 };
 
-struct Module Maneuver_module = {
+const struct ShellCommand CMD_Maneuver = {
     .name = "mnv",
     .execute = execute,
-    .settings = &settings
 };

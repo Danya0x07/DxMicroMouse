@@ -1,6 +1,6 @@
 #include "battery.h"
 #include "mcu.h"
-#include <stdlib.h>
+#include <stdio.h>
 
 #define BATTERY_CHECK_PERIOD    1000
 
@@ -52,17 +52,12 @@ const char *Battery_StatusToStr(BatteryStatus status)
     return STATUS_TXT[status];
 }
 
-static void WriteTelemetry(char out[TELEMETRY_STRING_SIZE])
+static void PrintTelemetry(void)
 {
-    snprintf(out, TELEMETRY_STRING_SIZE, "BATTERY:%d => %s\n", batteryLevel, Battery_StatusToStr(Battery_GetStatus()));
+    printf("BATTERY:%d => %s\n", batteryLevel, Battery_StatusToStr(Battery_GetStatus()));
 }
 
-static struct ModuleTelemetry telemetry = {
-    .interval = 1000,
-    .write = WriteTelemetry
-};
-
-struct Module Battery_module = {
-    .name = "battery",
-    .telemetry = &telemetry
+struct SchedulerTask TASK_TmBattery = {
+    .execute = PrintTelemetry,
+    .period = 1000
 };
