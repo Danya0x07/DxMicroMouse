@@ -1,5 +1,4 @@
 #include "mpu6500.h"
-#include "mpu6500_port.h"
 
 #define REG_SELF_TEST_X_GYRO    0x00
 #define REG_SELF_TEST_Y_GYRO    0x01
@@ -241,65 +240,82 @@
 #define REG_ZA_OFFSET_H     0x7D
 #define REG_ZA_OFFSET_L     0x7E
 
-static void WriteRegister(uint8_t reg, uint8_t data)
+static void WriteRegister(struct MPU6500_Device *dev, uint8_t reg, uint8_t data)
 {
-    CS_LOW();
-    SPI_TransferByte(reg & 0x7F);
-    SPI_TransferByte(data);
-    CS_HIGH();
+    uint8_t out[2] = {reg & 0x7F, data};
+
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, NULL, out, 2);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 }
 
-static uint8_t ReadRegister(uint8_t reg)
+static uint8_t ReadRegister(struct MPU6500_Device *dev, uint8_t reg)
 {
-    CS_LOW();
-    SPI_TransferByte(0x80 | reg);
-    uint8_t data = SPI_TransferByte(0);
-    CS_HIGH();
-    return data;
+    uint8_t out = 0x80 | reg;
+    uint8_t in;
+
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, NULL, &out, 1);
+    SPI_TransferData(dev->bus, &in, NULL, 1);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
+
+    return in;
 }
 
-static void WriteBits(uint8_t reg, uint8_t maskDisable, uint8_t maskEnable)
+static void WriteBits(struct MPU6500_Device *dev, uint8_t reg, uint8_t maskDisable, uint8_t maskEnable)
 {
-    uint8_t data = ReadRegister(reg);
+    uint8_t data = ReadRegister(dev, reg);
     data &= ~maskDisable;
     data |= maskEnable;
-    WriteRegister(reg, data);
+    WriteRegister(dev, reg, data);
 }
 
-static void SetBits(uint8_t reg, uint8_t mask, FunctionalState state)
+static void SetBits(struct MPU6500_Device *dev, uint8_t reg, uint8_t mask, FunctionalState state)
 {
     if (state == ENABLE)
-        WriteBits(reg, 0, mask);
+        WriteBits(dev, reg, 0, mask);
     else
-        WriteBits(reg, mask, 0);
+        WriteBits(dev, reg, mask, 0);
 }
 
-static void ReadBuffer(uint8_t reg, uint8_t *buff, uint8_t len)
+static void ReadBuffer(struct MPU6500_Device *dev, uint8_t reg, uint8_t *buff, uint8_t len)
 {
-    CS_LOW();
-    SPI_TransferByte(0x80 | reg);
-    SPI_TransferBytes(buff, NULL, len);
-    CS_HIGH();
+    reg |= 0x80;
+
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, NULL, &reg, 1);
+    SPI_TransferData(dev->bus, buff, NULL, len);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 }
 
-static void WriteBuffer(uint8_t reg, const uint8_t *buff, uint8_t len)
+static void WriteBuffer(struct MPU6500_Device *dev, uint8_t reg, const uint8_t *buff, uint8_t len)
 {
-    CS_LOW();
-    SPI_TransferByte(reg & 0x7F);
-    SPI_TransferBytes(NULL, buff, len);
-    CS_HIGH();
+    reg &= 0x7F;
+
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, NULL, &reg, 1);
+    SPI_TransferData(dev->bus, NULL, buff, len);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 }
 
-uint8_t MPU6500_ReadID(void)
+uint8_t MPU6500_ReadID(struct MPU6500_Device *dev)
 {
-    return ReadRegister(REG_WHO_AM_I);
+    return ReadRegister(dev, REG_WHO_AM_I);
 }
 
-void MPU6500_Configure(const struct MPU6500_Configuration *cfg)
+void MPU6500_Configure(struct MPU6500_Device *dev, const struct MPU6500_Configuration *cfg)
 {
     uint8_t tmp;
 
-    WriteRegister(REG_CONFIG,
+    WriteRegister(dev, REG_CONFIG,
         cfg->fifo.mode << BS_FIFO_MODE
         | cfg->fsyncPosition << BS_EXT_SYNC_SET
         | cfg->gyro.bandwidth << BS_DPLF_CFG
@@ -307,16 +323,16 @@ void MPU6500_Configure(const struct MPU6500_Configuration *cfg)
 
     tmp = cfg->gyro.bandwidth == MPU6500_GYRO_BANDWIDTH_3600Hz_0Ms11 ? 2 :
             cfg->gyro.bandwidth == MPU6500_GYRO_BANDWIDTH_8800Hz_0Ms064 ? 1 : 0;
-    WriteRegister(REG_GYRO_CONFIG, cfg->gyro.range << BS_GYRO_FS_SEL | tmp << BS_FCHOICE_B);
+    WriteRegister(dev, REG_GYRO_CONFIG, cfg->gyro.range << BS_GYRO_FS_SEL | tmp << BS_FCHOICE_B);
 
-    WriteRegister(REG_ACCEL_CONFIG, cfg->accel.range << BS_ACCEL_FS_SEL);
-    WriteRegister(REG_ACCEL_CONFIG_2,
+    WriteRegister(dev, REG_ACCEL_CONFIG, cfg->accel.range << BS_ACCEL_FS_SEL);
+    WriteRegister(dev, REG_ACCEL_CONFIG_2,
         (cfg->accel.bandwidth == MPU6500_ACCEL_BANDWIDTH_1130Hz_0Ms75) << BS_ACCEL_FCHOICE_B
         | cfg->accel.bandwidth << BS_A_DPLF_CFG
     );
-    WriteRegister(REG_LP_ACCEL_ODR, cfg->accel.lpfrequency << BS_LPOSC_CLKSEL);
+    WriteRegister(dev, REG_LP_ACCEL_ODR, cfg->accel.lpfrequency << BS_LPOSC_CLKSEL);
 
-    WriteRegister(REG_FIFO_EN,
+    WriteRegister(dev, REG_FIFO_EN,
         cfg->fifo.writeTemp << BS_TEMP_FIFO_EN
         | cfg->fifo.writeGyroX << BS_GYRO_XOUT
         | cfg->fifo.writeGyroY << BS_GYRO_YOUT
@@ -326,14 +342,14 @@ void MPU6500_Configure(const struct MPU6500_Configuration *cfg)
         | cfg->fifo.writeSlave1 << BS_SLV1
         | cfg->fifo.writeSlave0 << BS_SLV0
     );
-    SetBits(REG_I2C_MST_CTRL, 1 << BS_SLV3_FIFO_EN, (FunctionalState)cfg->fifo.writeSlave3);
+    SetBits(dev, REG_I2C_MST_CTRL, 1 << BS_SLV3_FIFO_EN, (FunctionalState)cfg->fifo.writeSlave3);
 }
 
-void MPU6500_GetSensorData(struct MPU6500_SensorData *data)
+void MPU6500_GetSensorData(struct MPU6500_Device *dev, struct MPU6500_SensorData *data)
 {
     uint8_t buff[14];
 
-    ReadBuffer(REG_ACCEL_XOUT_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_ACCEL_XOUT_H, buff, sizeof(buff));
     data->accelX = (int16_t)buff[0] << 8 | buff[1];
     data->accelY = (int16_t)buff[2] << 8 | buff[3];
     data->accelZ = (int16_t)buff[4] << 8 | buff[5];
@@ -343,17 +359,17 @@ void MPU6500_GetSensorData(struct MPU6500_SensorData *data)
     data->gyroZ = (int16_t)buff[12] << 8 | buff[13];
 }
 
-void MPU6500_SetClockSource(enum MPU6500_ClockSource clk)
+void MPU6500_SetClockSource(struct MPU6500_Device *dev, enum MPU6500_ClockSource clk)
 {
-    WriteBits(REG_PWR_MGMT_1, 0x7 << BS_CLKSEL, clk << BS_CLKSEL);
+    WriteBits(dev, REG_PWR_MGMT_1, 0x7 << BS_CLKSEL, clk << BS_CLKSEL);
 }
 
-void MPU6500_SetSampleRateDivider(uint8_t div)
+void MPU6500_SetSampleRateDivider(struct MPU6500_Device *dev, uint8_t div)
 {
-    WriteRegister(REG_SMPLRT_DIV, div);
+    WriteRegister(dev, REG_SMPLRT_DIV, div);
 }
 
-void MPU6500_SetPowerMode(enum MPU6500_PowerMode mode)
+void MPU6500_SetPowerMode(struct MPU6500_Device *dev, enum MPU6500_PowerMode mode)
 {
     struct MPU6500_SensorPower power;
 
@@ -361,71 +377,71 @@ void MPU6500_SetPowerMode(enum MPU6500_PowerMode mode)
 
     case MPU6500_PowerMode_SLEEP:
         power = (struct MPU6500_SensorPower){DISABLE};
-        MPU6500_SetSensorsPower(&power);
-        MPU6500_SetDmpState(DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_SLEEP, ENABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
+        MPU6500_SetSensorsPower(dev, &power);
+        MPU6500_SetDmpState(dev, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_SLEEP, ENABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
         break;
 
     case MPU6500_PowerMode_GYRO_STANDBY:
         power.tempSensor = DISABLE;
         power.accelX = power.accelY = power.accelZ = DISABLE;
         power.gyroX = power.gyroY = power.gyroZ = ENABLE;
-        MPU6500_SetSensorsPower(&power);
-        MPU6500_SetDmpState(DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, ENABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
+        MPU6500_SetSensorsPower(dev, &power);
+        MPU6500_SetDmpState(dev, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, ENABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
         break;
 
     case MPU6500_PowerMode_ACCEL_LOWPOWER:
         power.tempSensor = DISABLE;
         power.accelX = power.accelY = power.accelZ = ENABLE;
         power.gyroX = power.gyroY = power.gyroZ = DISABLE;
-        MPU6500_SetSensorsPower(&power);
-        MPU6500_SetDmpState(DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_CYCLE, ENABLE);
+        MPU6500_SetSensorsPower(dev, &power);
+        MPU6500_SetDmpState(dev, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_CYCLE, ENABLE);
         break;
 
     case MPU6500_PowerMode_ACCEL_LOWNOISE:
         power.tempSensor = ENABLE;
         power.accelX = power.accelY = power.accelZ = ENABLE;
         power.gyroX = power.gyroY = power.gyroZ = DISABLE;
-        MPU6500_SetSensorsPower(&power);
-        MPU6500_SetDmpState(DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
+        MPU6500_SetSensorsPower(dev, &power);
+        MPU6500_SetDmpState(dev, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
         break;
 
     case MPU6500_PowerMode_GYRO_ONLY:
         power.tempSensor = ENABLE;
         power.accelX = power.accelY = power.accelZ = DISABLE;
         power.gyroX = power.gyroY = power.gyroZ = ENABLE;
-        MPU6500_SetSensorsPower(&power);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
+        MPU6500_SetSensorsPower(dev, &power);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
         break;
 
     case MPU6500_PowerMode_6AXIS:
         power.tempSensor = ENABLE;
         power.accelX = power.accelY = power.accelZ = ENABLE;
         power.gyroX = power.gyroY = power.gyroZ = ENABLE;
-        MPU6500_SetSensorsPower(&power);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
-        SetBits(REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
+        MPU6500_SetSensorsPower(dev, &power);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_SLEEP, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_GYRO_STANDBY, DISABLE);
+        SetBits(dev, REG_PWR_MGMT_1, 1 << BS_CYCLE, DISABLE);
         break;
     }
 }
 
-void MPU6500_SetSensorsPower(const struct MPU6500_SensorPower *pwr)
+void MPU6500_SetSensorsPower(struct MPU6500_Device *dev, const struct MPU6500_SensorPower *pwr)
 {
-    WriteRegister(REG_PWR_MGMT_2,
+    WriteRegister(dev, REG_PWR_MGMT_2,
         !pwr->accelX << BS_DIS_XA
         | !pwr->accelY << BS_DIS_YA
         | !pwr->accelZ << BS_DIS_ZA
@@ -433,15 +449,15 @@ void MPU6500_SetSensorsPower(const struct MPU6500_SensorPower *pwr)
         | !pwr->gyroY << BS_DIS_YG
         | !pwr->gyroZ << BS_DIS_ZG
     );
-    SetBits(REG_PWR_MGMT_1, 1 << BS_TEMP_DIS, (FunctionalState)!pwr->tempSensor);
+    SetBits(dev, REG_PWR_MGMT_1, 1 << BS_TEMP_DIS, (FunctionalState)!pwr->tempSensor);
 }
 
-void MPU6500_GetSensorsPower(struct MPU6500_SensorPower *pwr)
+void MPU6500_GetSensorsPower(struct MPU6500_Device *dev, struct MPU6500_SensorPower *pwr)
 {
-    uint8_t value = ReadRegister(REG_PWR_MGMT_1);
+    uint8_t value = ReadRegister(dev, REG_PWR_MGMT_1);
     pwr->tempSensor = (FunctionalState)((value & 1 << BS_TEMP_DIS) == 0);
 
-    value = ReadRegister(REG_PWR_MGMT_2);
+    value = ReadRegister(dev, REG_PWR_MGMT_2);
     pwr->accelX = (FunctionalState)((value & 1 << BS_DIS_XA) == 0);
     pwr->accelY = (FunctionalState)((value & 1 << BS_DIS_YA) == 0);
     pwr->accelZ = (FunctionalState)((value & 1 << BS_DIS_ZA) == 0);
@@ -450,9 +466,9 @@ void MPU6500_GetSensorsPower(struct MPU6500_SensorPower *pwr)
     pwr->gyroZ  = (FunctionalState)((value & 1 << BS_DIS_ZG) == 0);
 }
 
-void MPU6500_ConfigureInterruptPin(const struct MPU6500_InterruptPinConfiguration *cfg)
+void MPU6500_ConfigureInterruptPin(struct MPU6500_Device *dev, const struct MPU6500_InterruptPinConfiguration *cfg)
 {
-    WriteBits(REG_INT_PIN_CFG, 0xFC,
+    WriteBits(dev, REG_INT_PIN_CFG, 0xFC,
         cfg->activeLevelLow << BS_ACTL
         | cfg->openDrain << BS_OPEN
         | cfg->latchUntilClear << BS_LATCH_INT_EN
@@ -462,9 +478,9 @@ void MPU6500_ConfigureInterruptPin(const struct MPU6500_InterruptPinConfiguratio
     );
 }
 
-void MPU6500_ConfigureInterrupt(const struct MPU6500_InterruptConfiguration *cfg)
+void MPU6500_ConfigureInterrupt(struct MPU6500_Device *dev, const struct MPU6500_InterruptConfiguration *cfg)
 {
-    WriteBits(REG_INT_ENABLE, 0x59,
+    WriteBits(dev, REG_INT_ENABLE, 0x59,
         cfg->wakeOnMotion << BS_WOM_EN
         | cfg->fifoOverflow << BS_FIFO_OFLOW_EN
         | cfg->fsyncTransition << BS_FSYNC_INT_EN
@@ -472,9 +488,9 @@ void MPU6500_ConfigureInterrupt(const struct MPU6500_InterruptConfiguration *cfg
     );
 }
 
-MPU6500_InterruptStatus MPU6500_GetInterruptStatus(void)
+MPU6500_InterruptStatus MPU6500_GetInterruptStatus(struct MPU6500_Device *dev)
 {
-    uint8_t value = ReadRegister(REG_INT_STATUS);
+    uint8_t value = ReadRegister(dev, REG_INT_STATUS);
     MPU6500_InterruptStatus status;
 
     status.wakeOnMotion = !!(value & 1 << BS_WOM_INT);
@@ -486,85 +502,86 @@ MPU6500_InterruptStatus MPU6500_GetInterruptStatus(void)
     return status;
 }
 
-void MPU6500_SetWakeOnMotionThreshold(uint8_t threshold)
+void MPU6500_SetWakeOnMotionThreshold(struct MPU6500_Device *dev, uint8_t threshold)
 {
-    WriteRegister(REG_WOM_THR, threshold);
+    WriteRegister(dev, REG_WOM_THR, threshold);
 }
 
-void MPU6500_SetupWakeOnMotionDetection(FunctionalState state, bool compareWithPreviousSample)
+void MPU6500_SetupWakeOnMotionDetection(struct MPU6500_Device *dev, FunctionalState state,
+                                        bool compareWithPreviousSample)
 {
-    WriteRegister(REG_ACCEL_INTEL_CTRL,
+    WriteRegister(dev, REG_ACCEL_INTEL_CTRL,
         state << BS_ACCEL_INTEL_EN
         | compareWithPreviousSample << BS_ACCEL_INTEL_MODE
     );
 }
 
-void MPU6500_SetFifoState(FunctionalState state)
+void MPU6500_SetFifoState(struct MPU6500_Device *dev, FunctionalState state)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_FIFO_EN, state);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_FIFO_EN, state);
 }
 
-uint16_t MPU6500_GetFifoCount(void)
+uint16_t MPU6500_GetFifoCount(struct MPU6500_Device *dev)
 {
     uint8_t buff[2];
-    ReadBuffer(REG_FIFO_COUNT_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_FIFO_COUNT_H, buff, sizeof(buff));
     return (uint16_t)buff[0] << 8 | buff[1];
 }
 
-uint8_t MPU6500_GetFifoData(void)
+uint8_t MPU6500_GetFifoData(struct MPU6500_Device *dev)
 {
-    return ReadRegister(REG_FIFO_R_W);
+    return ReadRegister(dev, REG_FIFO_R_W);
 }
 
-void MPU6500_SelfTestOn(uint8_t selfTestMask)
+void MPU6500_SelfTestOn(struct MPU6500_Device *dev, uint8_t selfTestMask)
 {
     uint8_t gyroMask = selfTestMask & 0xE0;
     uint8_t accelMask = selfTestMask << 3 & 0xE0;
-    WriteBits(REG_GYRO_CONFIG, 0xE0, gyroMask);
-    WriteBits(REG_ACCEL_CONFIG, 0xE0, accelMask);
+    WriteBits(dev, REG_GYRO_CONFIG, 0xE0, gyroMask);
+    WriteBits(dev, REG_ACCEL_CONFIG, 0xE0, accelMask);
 }
 
-void MPU6500_GetSelfTestData(struct MPU6500_SelfTestData *selfTestData)
+void MPU6500_GetSelfTestData(struct MPU6500_Device *dev, struct MPU6500_SelfTestData *selfTestData)
 {
     uint8_t buff[3];
 
-    ReadBuffer(REG_SELF_TEST_X_GYRO, buff, sizeof(buff));
+    ReadBuffer(dev, REG_SELF_TEST_X_GYRO, buff, sizeof(buff));
     selfTestData->gyroX = buff[0];
     selfTestData->gyroY = buff[1];
     selfTestData->gyroZ = buff[2];
 
-    ReadBuffer(REG_SELF_TEST_X_ACCEL, buff, sizeof(buff));
+    ReadBuffer(dev, REG_SELF_TEST_X_ACCEL, buff, sizeof(buff));
     selfTestData->accelX = buff[0];
     selfTestData->accelY = buff[1];
     selfTestData->accelZ = buff[2];
 }
 
-void MPU6500_GetOffset(struct MPU6500_SensorData *offset)
+void MPU6500_GetOffset(struct MPU6500_Device *dev, struct MPU6500_SensorData *offset)
 {
     uint8_t buff[2];
 
-    ReadBuffer(REG_XG_OFFSET_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_XG_OFFSET_H, buff, sizeof(buff));
     offset->gyroX = (int16_t)buff[0] << 8 | buff[1];
 
-    ReadBuffer(REG_YG_OFFSET_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_YG_OFFSET_H, buff, sizeof(buff));
     offset->gyroY = (int16_t)buff[0] << 8 | buff[1];
 
-    ReadBuffer(REG_ZG_OFFSET_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_ZG_OFFSET_H, buff, sizeof(buff));
     offset->gyroZ = (int16_t)buff[0] << 8 | buff[1];
 
-    ReadBuffer(REG_XA_OFFSET_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_XA_OFFSET_H, buff, sizeof(buff));
     offset->accelX = (int16_t)buff[0] << 8 | buff[1];
 
-    ReadBuffer(REG_YA_OFFSET_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_YA_OFFSET_H, buff, sizeof(buff));
     offset->accelY = (int16_t)buff[0] << 8 | buff[1];
 
-    ReadBuffer(REG_ZA_OFFSET_H, buff, sizeof(buff));
+    ReadBuffer(dev, REG_ZA_OFFSET_H, buff, sizeof(buff));
     offset->accelZ = (int16_t)buff[0] << 8 | buff[1];
 
     offset->temp = 0;
 }
 
-void MPU6500_SetOffset(const struct MPU6500_SensorData *offset)
+void MPU6500_SetOffset(struct MPU6500_Device *dev, const struct MPU6500_SensorData *offset)
 {
     uint8_t buff[6];
 
@@ -574,7 +591,7 @@ void MPU6500_SetOffset(const struct MPU6500_SensorData *offset)
     buff[3] = (uint8_t)(offset->gyroY & 0xFF);
     buff[4] = (uint8_t)(offset->gyroZ >> 8);
     buff[5] = (uint8_t)(offset->gyroZ & 0xFF);
-    WriteBuffer(REG_XG_OFFSET_H, buff, sizeof(buff));
+    WriteBuffer(dev, REG_XG_OFFSET_H, buff, sizeof(buff));
 
     buff[0] = (uint8_t)(offset->accelX >> 8);
     buff[1] = (uint8_t)(offset->accelX & 0xFF);
@@ -582,42 +599,42 @@ void MPU6500_SetOffset(const struct MPU6500_SensorData *offset)
     buff[3] = (uint8_t)(offset->accelY & 0xFF);
     buff[4] = (uint8_t)(offset->accelZ >> 8);
     buff[5] = (uint8_t)(offset->accelZ & 0xFF);
-    WriteRegister(REG_XA_OFFSET_H, buff[0]);
-    WriteBits(REG_XA_OFFSET_L, 0xFE, buff[1] & 0xFE);
-    WriteRegister(REG_YA_OFFSET_H, buff[2]);
-    WriteBits(REG_YA_OFFSET_L, 0xFE, buff[3] & 0xFE);
-    WriteRegister(REG_ZA_OFFSET_H, buff[4]);
-    WriteBits(REG_ZA_OFFSET_L, 0xFE, buff[5] & 0xFE);
+    WriteRegister(dev, REG_XA_OFFSET_H, buff[0]);
+    WriteBits(dev, REG_XA_OFFSET_L, 0xFE, buff[1] & 0xFE);
+    WriteRegister(dev, REG_YA_OFFSET_H, buff[2]);
+    WriteBits(dev, REG_YA_OFFSET_L, 0xFE, buff[3] & 0xFE);
+    WriteRegister(dev, REG_ZA_OFFSET_H, buff[4]);
+    WriteBits(dev, REG_ZA_OFFSET_L, 0xFE, buff[5] & 0xFE);
 }
 
-void MPU6500_ConfigureAuxMaster(const struct MPU6500_AuxMasterConfiguration *cfg)
+void MPU6500_ConfigureAuxMaster(struct MPU6500_Device *dev, const struct MPU6500_AuxMasterConfiguration *cfg)
 {
-    WriteBits(REG_I2C_MST_CTRL, ~(1 << BS_SLV3_FIFO_EN),
+    WriteBits(dev, REG_I2C_MST_CTRL, ~(1 << BS_SLV3_FIFO_EN),
         cfg->multimaster << BS_MULT_MST_EN
         | cfg->waitForExternalData << BS_WAIT_FOR_ES
         | cfg->stopBetweenReads << BS_I2C_MST_P_NSR
         | cfg->clock << BS_I2C_MST_CLK
     );
 
-    WriteBits(REG_I2C_SLV4_CTRL, 0x1F, cfg->accessDelay & 0x1F);
-    SetBits(REG_I2C_MST_DELAY_CTRL, 1 << BS_DELAY_ES_SHADOW, (FunctionalState)cfg->delayShadow);
+    WriteBits(dev, REG_I2C_SLV4_CTRL, 0x1F, cfg->accessDelay & 0x1F);
+    SetBits(dev, REG_I2C_MST_DELAY_CTRL, 1 << BS_DELAY_ES_SHADOW, (FunctionalState)cfg->delayShadow);
 }
 
-void MPU6500_SetAuxMasterState(FunctionalState state)
+void MPU6500_SetAuxMasterState(struct MPU6500_Device *dev, FunctionalState state)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_I2C_MST_EN, state);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_I2C_MST_EN, state);
 }
 
-void MPU6500_SetAuxBypassState(FunctionalState state)
+void MPU6500_SetAuxBypassState(struct MPU6500_Device *dev, FunctionalState state)
 {
-    SetBits(REG_INT_PIN_CFG, 1 << BS_BYPASS_EN, state);
+    SetBits(dev, REG_INT_PIN_CFG, 1 << BS_BYPASS_EN, state);
 }
 
-MPU6500_AuxMasterStatus MPU6500_GetAuxMasterStatus(void)
+MPU6500_AuxMasterStatus MPU6500_GetAuxMasterStatus(struct MPU6500_Device *dev)
 {
     MPU6500_AuxMasterStatus status;
 
-    uint8_t value = ReadRegister(REG_MST_STATUS);
+    uint8_t value = ReadRegister(dev, REG_MST_STATUS);
     status.passThrough = !!(value & 1 << BS_PASS_THROUGH);
     status.slave4TransferFinished = !!(value & 1 << BS_I2C_SLV4_DONE);
     status.lostArbitration = !!(value & 1 << BS_I2C_LOST_ARB);
@@ -630,96 +647,97 @@ MPU6500_AuxMasterStatus MPU6500_GetAuxMasterStatus(void)
     return status;
 }
 
-void MPU6500_ConfigureAuxSlave(enum MPU6500_AuxSlave slave, const struct MPU6500_AuxSlaveConfiguration *cfg)
+void MPU6500_ConfigureAuxSlave(struct MPU6500_Device *dev, enum MPU6500_AuxSlave slave,
+                               const struct MPU6500_AuxSlaveConfiguration *cfg)
 {
     uint8_t regAddr = REG_I2C_SLV0_ADDR + 3 * slave;
     uint8_t regReg = regAddr + 1;
     uint8_t regCtrl = regAddr + 2;
 
-    WriteRegister(regAddr, cfg->address | cfg->transferDirection << 7);
-    WriteRegister(regReg, cfg->regaddr);
-    WriteRegister(regCtrl,
+    WriteRegister(dev, regAddr, cfg->address | cfg->transferDirection << 7);
+    WriteRegister(dev, regReg, cfg->regaddr);
+    WriteRegister(dev, regCtrl,
         cfg->byteSwap << BS_I2C_SLV0_BYTE_SW
         | cfg->skipReg << BS_I2C_SLV0_REG_DIS
         | cfg->byteGrouping << BS_I2C_SLV0_GRP
         | cfg->dataLen << BS_I2C_SLV0_LENG
     );
-    SetBits(REG_I2C_MST_DELAY_CTRL, 1 << slave, cfg->delay);
+    SetBits(dev, REG_I2C_MST_DELAY_CTRL, 1 << slave, cfg->delay);
 }
 
-void MPU6500_SetAuxSlaveState(enum MPU6500_AuxSlave slave, FunctionalState state)
+void MPU6500_SetAuxSlaveState(struct MPU6500_Device *dev, enum MPU6500_AuxSlave slave, FunctionalState state)
 {
     uint8_t regCtrl = REG_I2C_SLV0_ADDR + 3 * slave + 2;
-    SetBits(regCtrl, 1 << BS_I2C_SLV0_EN, state);
+    SetBits(dev, regCtrl, 1 << BS_I2C_SLV0_EN, state);
 }
 
-void MPU6500_SetAuxSlaveOutData(enum MPU6500_AuxSlave slave, uint8_t data)
+void MPU6500_SetAuxSlaveOutData(struct MPU6500_Device *dev, enum MPU6500_AuxSlave slave, uint8_t data)
 {
     uint8_t regDataOut = REG_I2C_SLV0_DO + slave;
-    WriteRegister(regDataOut, data);
+    WriteRegister(dev, regDataOut, data);
 }
 
-void MPU6500_GetAuxSensorData(uint8_t *data, uint8_t len)
+void MPU6500_GetAuxSensorData(struct MPU6500_Device *dev, uint8_t *data, uint8_t len)
 {
-    ReadBuffer(REG_EXT_SENS_DATA_00, data, len);
+    ReadBuffer(dev, REG_EXT_SENS_DATA_00, data, len);
 }
 
-void MPU6500_ConfigureAuxSlave4(const struct MPU6500_AuxSlave4Configuration *cfg)
+void MPU6500_ConfigureAuxSlave4(struct MPU6500_Device *dev, const struct MPU6500_AuxSlave4Configuration *cfg)
 {
-    WriteRegister(REG_I2C_SLV4_ADDR, cfg->address);
-    SetBits(REG_I2C_MST_DELAY_CTRL, 1 << BS_I2C_SLV4_DLY_EN, cfg->delay);
+    WriteRegister(dev, REG_I2C_SLV4_ADDR, cfg->address);
+    SetBits(dev, REG_I2C_MST_DELAY_CTRL, 1 << BS_I2C_SLV4_DLY_EN, cfg->delay);
 }
 
-void MPU6500_RequestAuxSlave4Transfer(MPU6500_AuxDirection dir,
+void MPU6500_RequestAuxSlave4Transfer(struct MPU6500_Device *dev, MPU6500_AuxDirection dir,
         uint8_t regAddr, bool skipReg, uint8_t outData, bool intOnFinish)
 {
-    SetBits(REG_I2C_SLV4_ADDR, 1 << 7, (FunctionalState)dir);
-    WriteRegister(REG_I2C_SLV4_REG, regAddr);
-    WriteRegister(REG_I2C_SLV4_DO, outData);
-    WriteBits(REG_I2C_SLV4_CTRL, 0xE0, 0x80 | skipReg << BS_I2C_SLV4_REG_DIS | intOnFinish << BS_SLV4_DONE_INT_EN);
+    SetBits(dev, REG_I2C_SLV4_ADDR, 1 << 7, (FunctionalState)dir);
+    WriteRegister(dev, REG_I2C_SLV4_REG, regAddr);
+    WriteRegister(dev, REG_I2C_SLV4_DO, outData);
+    WriteBits(dev, REG_I2C_SLV4_CTRL, 0xE0, 0x80 | skipReg << BS_I2C_SLV4_REG_DIS | intOnFinish << BS_SLV4_DONE_INT_EN);
 }
 
-uint8_t MPU6500_GetAuxSlave4Data(void)
+uint8_t MPU6500_GetAuxSlave4Data(struct MPU6500_Device *dev)
 {
-    return ReadRegister(REG_I2C_SLV4_DI);
+    return ReadRegister(dev, REG_I2C_SLV4_DI);
 }
 
-void MPU6500_ResetSignalPath(bool accel, bool gyro, bool temp)
+void MPU6500_ResetSignalPath(struct MPU6500_Device *dev, bool accel, bool gyro, bool temp)
 {
-    WriteRegister(REG_SIGNAL_PATH_RESET, gyro << BS_GYRO_RST | accel << BS_ACCEL_RST | temp << BS_TEMP_RST);
+    WriteRegister(dev, REG_SIGNAL_PATH_RESET, gyro << BS_GYRO_RST | accel << BS_ACCEL_RST | temp << BS_TEMP_RST);
 }
 
-void MPU6500_ResetSensors(void)
+void MPU6500_ResetSensors(struct MPU6500_Device *dev)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_SIG_COND_RST, ENABLE);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_SIG_COND_RST, ENABLE);
 }
 
-void MPU6500_ResetFIFO(void)
+void MPU6500_ResetFIFO(struct MPU6500_Device *dev)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_FIFO_RST, ENABLE);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_FIFO_RST, ENABLE);
 }
 
-void MPU6500_ResetPrimaryI2C(void)
+void MPU6500_ResetPrimaryI2C(struct MPU6500_Device *dev)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_I2C_IF_DIS, ENABLE);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_I2C_IF_DIS, ENABLE);
 }
 
-void MPU6500_ResetAuxilaryI2C(void)
+void MPU6500_ResetAuxilaryI2C(struct MPU6500_Device *dev)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_I2C_MST_RST, ENABLE);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_I2C_MST_RST, ENABLE);
 }
 
-void MPU6500_ResetDMP(void)
+void MPU6500_ResetDMP(struct MPU6500_Device *dev)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_DMP_RST, ENABLE);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_DMP_RST, ENABLE);
 }
 
-void MPU6500_ResetDevice(void)
+void MPU6500_ResetDevice(struct MPU6500_Device *dev)
 {
-    SetBits(REG_PWR_MGMT_1, 1 << BS_DEVICE_RESET, ENABLE);
+    SetBits(dev, REG_PWR_MGMT_1, 1 << BS_DEVICE_RESET, ENABLE);
 }
 
-void MPU6500_SetDmpState(FunctionalState state)
+void MPU6500_SetDmpState(struct MPU6500_Device *dev, FunctionalState state)
 {
-    SetBits(REG_USER_CTRL, 1 << BS_DMP_EN, state);
+    SetBits(dev, REG_USER_CTRL, 1 << BS_DMP_EN, state);
 }

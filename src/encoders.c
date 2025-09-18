@@ -4,6 +4,22 @@
 #include <stdio.h>
 #include <string.h>
 
+struct AS5048_Device encoderLeft = {
+    .bus = SPI_Bus_PH1,
+    .cs = {
+        .port = ENCL_CS_GPIO,
+        .pin = ENCL_CS_PIN
+    }
+};
+
+struct AS5048_Device encoderRight = {
+    .bus = SPI_Bus_PH1,
+    .cs = {
+        .port = ENCR_CS_GPIO,
+        .pin = ENCR_CS_PIN
+    }
+};
+
 struct EncoderCounts current, previous, delta;
 
 int Encoders_Init(void)
@@ -14,12 +30,12 @@ int Encoders_Init(void)
     SysTick_DisableInterrupt();
 
     // To clear initial errors
-    (void)AS5048_GetErrors(AS5048_Handle_LEFT);
-    (void)AS5048_GetErrors(AS5048_Handle_RIGHT);
+    (void)AS5048_GetErrors(&encoderLeft);
+    (void)AS5048_GetErrors(&encoderRight);
 
     for (int i = 0; i < 5; i++) {
-        AS5048_GetDiagnosticsData(AS5048_Handle_LEFT, &diagnosticsDataLeft);
-        AS5048_GetDiagnosticsData(AS5048_Handle_RIGHT, &diagnosticsDataRight);
+        AS5048_GetDiagnosticsData(&encoderLeft, &diagnosticsDataLeft);
+        AS5048_GetDiagnosticsData(&encoderRight, &diagnosticsDataRight);
         if (diagnosticsDataLeft.offsetCompensationFinished && diagnosticsDataRight.offsetCompensationFinished)
             break;
         Micros_Wait(10000);
@@ -43,8 +59,8 @@ int Encoders_Init(void)
         retcode = -1;
     }
 
-    union AS5048_Errors errorsLeft = AS5048_GetErrors(AS5048_Handle_LEFT);
-    union AS5048_Errors errorsRight = AS5048_GetErrors(AS5048_Handle_RIGHT);
+    union AS5048_Errors errorsLeft = AS5048_GetErrors(&encoderLeft);
+    union AS5048_Errors errorsRight = AS5048_GetErrors(&encoderRight);
     if (errorsLeft.status != 0 || errorsRight.status != 0) {
         printf("AS5048 errors during initialization\n");
         printf("\tAS5048 Left:\nparity: %d\ncommand: %d\nframing: %d\n",
@@ -59,8 +75,8 @@ int Encoders_Init(void)
         );
     }
 
-    uint16_t magnitudeLeft = AS5048_GetMagnitudeRaw(AS5048_Handle_LEFT);
-    uint16_t magnitudeRight = AS5048_GetMagnitudeRaw(AS5048_Handle_RIGHT);
+    uint16_t magnitudeLeft = AS5048_GetMagnitudeRaw(&encoderLeft);
+    uint16_t magnitudeRight = AS5048_GetMagnitudeRaw(&encoderRight);
     printf("Magnetic field magnitude:\nL:%d\tR:%d\n", magnitudeLeft, magnitudeRight);
 
     Encoders_Reset();
@@ -73,8 +89,8 @@ void Encoders_Update(void)
 {
     int32_t leftPrev = previous.left;
     int32_t rightPrev = previous.right;
-    int32_t left = AS5048_GetAngleRaw(AS5048_Handle_LEFT) >> 2;
-    int32_t right = AS5048_GetAngleRaw(AS5048_Handle_RIGHT) >> 2;
+    int32_t left = AS5048_GetAngleRaw(&encoderLeft) >> 2;
+    int32_t right = AS5048_GetAngleRaw(&encoderRight) >> 2;
 
     int32_t diff = left - leftPrev;
     if (diff >= 0x07FF || diff <= -0x07FF) {
@@ -102,10 +118,10 @@ void Encoders_Update(void)
 
 void Encoders_Reset(void)
 {
-    AS5048_SetZero(AS5048_Handle_LEFT, 0);
-    AS5048_SetZero(AS5048_Handle_RIGHT, 0);
-    AS5048_SetZero(AS5048_Handle_LEFT, AS5048_GetAngleRaw(AS5048_Handle_LEFT));
-    AS5048_SetZero(AS5048_Handle_RIGHT, AS5048_GetAngleRaw(AS5048_Handle_RIGHT));
+    AS5048_SetZero(&encoderLeft, 0);
+    AS5048_SetZero(&encoderRight, 0);
+    AS5048_SetZero(&encoderLeft, AS5048_GetAngleRaw(&encoderLeft));
+    AS5048_SetZero(&encoderRight, AS5048_GetAngleRaw(&encoderRight));
     current = previous = delta = (struct EncoderCounts){0};
 }
 

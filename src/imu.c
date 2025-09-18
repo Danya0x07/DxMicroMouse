@@ -42,6 +42,14 @@ static const uint16_t mpu6500SelfTestTable[256] = {
     30903,31212,31524,31839,32157,32479,32804,33132
 };
 
+static struct MPU6500_Device mpu = {
+    .bus = SPI_Bus_PH0,
+    .cs = {
+        .port = IMU_CS_GPIO,
+        .pin = IMU_CS_PIN
+    }
+};
+
 static struct IMU_Data currentData;
 static struct MPU6500_SensorData sensorOffset = {0};
 
@@ -57,7 +65,7 @@ static void GetAverages(struct ImuAverage *avg, uint16_t numToAverage, uint16_t 
     int32_t avgAccelX = 0, avgAccelY = 0, avgAccelZ = 0, avgGyroX = 0, avgGyroY = 0, avgGyroZ = 0;
 
     for (int i = 0; i < numToSkip + numToAverage; i++) {
-        MPU6500_GetSensorData(&sensorData);
+        MPU6500_GetSensorData(&mpu, &sensorData);
         Micros_WaitMillis(2);
         if (i < numToSkip)
             continue;
@@ -81,7 +89,7 @@ static void GetDeviationFromFactoryTrim(const struct ImuAverage *testOn,
                                         ImuDeviation *deviation)
 {
     struct MPU6500_SelfTestData selfTestData;
-    MPU6500_GetSelfTestData(&selfTestData);
+    MPU6500_GetSelfTestData(&mpu, &selfTestData);
 
     const int32_t factoryTrimAccelX = mpu6500SelfTestTable[selfTestData.accelX];
     const int32_t factoryTrimAccelY = mpu6500SelfTestTable[selfTestData.accelY];
@@ -100,7 +108,7 @@ static void GetDeviationFromFactoryTrim(const struct ImuAverage *testOn,
 
 static void ApplyOffsetsByAverage(const struct ImuAverage *avg)
 {
-    MPU6500_GetOffset(&sensorOffset);
+    MPU6500_GetOffset(&mpu, &sensorOffset);
 
     sensorOffset.accelX -= (int16_t)avg->aX;
     sensorOffset.accelY -= (int16_t)avg->aY;
@@ -110,7 +118,7 @@ static void ApplyOffsetsByAverage(const struct ImuAverage *avg)
     sensorOffset.gyroY = -(int16_t)avg->gY;
     sensorOffset.gyroZ = -(int16_t)avg->gZ;
 
-    MPU6500_SetOffset(&sensorOffset);
+    MPU6500_SetOffset(&mpu, &sensorOffset);
 }
 
 int IMU_Init(enum ImuConfiguration configuration)
@@ -172,26 +180,26 @@ int IMU_Init(enum ImuConfiguration configuration)
     }
 
     // Perform reset
-    MPU6500_ResetDevice();
+    MPU6500_ResetDevice(&mpu);
     Micros_WaitMillis(100);
-    MPU6500_ResetSignalPath(true, true, true);
+    MPU6500_ResetSignalPath(&mpu, true, true, true);
     Micros_WaitMillis(100);
 
     // Check ID
     uint8_t id;
-    if ((id = MPU6500_ReadID()) != 0x70) {
+    if ((id = MPU6500_ReadID(&mpu)) != 0x70) {
         printf("MPU6500 ID mismatch: expected 0x70, got 0x%x\n", id);
         retcode = -1;
     }
 
-    MPU6500_Configure(&config);
-    MPU6500_ConfigureInterruptPin(&intPinConfig);
-    MPU6500_SetPowerMode(MPU6500_PowerMode_6AXIS);
-    MPU6500_SetClockSource(MPU6500_ClockSource_AUTOPLL);
-    MPU6500_ConfigureInterrupt(&intConfig);
+    MPU6500_Configure(&mpu, &config);
+    MPU6500_ConfigureInterruptPin(&mpu, &intPinConfig);
+    MPU6500_SetPowerMode(&mpu, MPU6500_PowerMode_6AXIS);
+    MPU6500_SetClockSource(&mpu, MPU6500_ClockSource_AUTOPLL);
+    MPU6500_ConfigureInterrupt(&mpu, &intConfig);
 
     if (configuration == ImuConfiguration_APP) {
-        MPU6500_SetOffset(&sensorOffset);
+        MPU6500_SetOffset(&mpu, &sensorOffset);
     }
     Micros_WaitMillis(100);
 
@@ -207,14 +215,14 @@ int IMU_Test(void)
     SysTick_DisableInterrupt();
     LED1_ON();
 
-    MPU6500_SelfTestOn(
+    MPU6500_SelfTestOn(&mpu,
         MPU6500_SELFTEST_XA | MPU6500_SELFTEST_YA | MPU6500_SELFTEST_ZA
         | MPU6500_SELFTEST_XG | MPU6500_SELFTEST_YG | MPU6500_SELFTEST_ZG
     );
     Micros_WaitMillis(25);
     GetAverages(&testOn, 1000, 100);
 
-    MPU6500_SelfTestOff();
+    MPU6500_SelfTestOff(&mpu);
     Micros_WaitMillis(25);
     GetAverages(&testOff, 1000, 100);
 
@@ -264,7 +272,7 @@ void IMU_Update(void)
 {
     if (GPIO_ReadInputDataBit(IMU_INT_GPIO, IMU_INT_PIN) == 1) {
         struct MPU6500_SensorData sensorData;
-        MPU6500_GetSensorData(&sensorData);
+        MPU6500_GetSensorData(&mpu, &sensorData);
 
         currentData.accelX = sensorData.accelX;
         currentData.accelY = sensorData.accelY;

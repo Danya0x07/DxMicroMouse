@@ -1,8 +1,14 @@
 #ifndef _INC_MPU6500_H
 #define _INC_MPU6500_H
 
-#include <stdint.h>
+#include <spi_io.h>
+#include <gpio_ctl.h>
 #include "mpu6500_conf.h"
+
+struct MPU6500_Device {
+    const SPI_Bus bus;
+    const struct GPIOCTL_Line cs;
+};
 
 struct MPU6500_SelfTestData {
     uint8_t gyroX;
@@ -235,33 +241,34 @@ enum MPU6500_ClockSource {
 };
 
 /** ID and General configuration and features. --------------------------------------------------- */
-uint8_t MPU6500_ReadID(void); // Should be 0x70
-void MPU6500_Configure(const struct MPU6500_Configuration *cfg);
-void MPU6500_GetSensorData(struct MPU6500_SensorData *data);
+uint8_t MPU6500_ReadID(struct MPU6500_Device *dev); // Should be 0x70
+void MPU6500_Configure(struct MPU6500_Device *dev, const struct MPU6500_Configuration *cfg);
+void MPU6500_GetSensorData(struct MPU6500_Device *dev, struct MPU6500_SensorData *data);
 
 /** Clock configuration. ------------------------------------------------------------------------- */
-void MPU6500_SetClockSource(enum MPU6500_ClockSource clk);
+void MPU6500_SetClockSource(struct MPU6500_Device *dev, enum MPU6500_ClockSource clk);
 // SAMPLE_RATE = 1kHz / (div + 1) */
-void MPU6500_SetSampleRateDivider(uint8_t div);
+void MPU6500_SetSampleRateDivider(struct MPU6500_Device *dev, uint8_t div);
 
 /** Power configuration. ------------------------------------------------------------------------- */
-void MPU6500_SetPowerMode(enum MPU6500_PowerMode mode);
-void MPU6500_SetSensorsPower(const struct MPU6500_SensorPower *pwr);
-void MPU6500_GetSensorsPower(struct MPU6500_SensorPower *pwr);
+void MPU6500_SetPowerMode(struct MPU6500_Device *dev, enum MPU6500_PowerMode mode);
+void MPU6500_SetSensorsPower(struct MPU6500_Device *dev, const struct MPU6500_SensorPower *pwr);
+void MPU6500_GetSensorsPower(struct MPU6500_Device *dev, struct MPU6500_SensorPower *pwr);
 
 /** Interrupt feature configuration. ------------------------------------------------------------- */
-void MPU6500_ConfigureInterruptPin(const struct MPU6500_InterruptPinConfiguration *cfg);
-void MPU6500_ConfigureInterrupt(const struct MPU6500_InterruptConfiguration *cfg);
-MPU6500_InterruptStatus MPU6500_GetInterruptStatus(void);
+void MPU6500_ConfigureInterruptPin(struct MPU6500_Device *dev, const struct MPU6500_InterruptPinConfiguration *cfg);
+void MPU6500_ConfigureInterrupt(struct MPU6500_Device *dev, const struct MPU6500_InterruptConfiguration *cfg);
+MPU6500_InterruptStatus MPU6500_GetInterruptStatus(struct MPU6500_Device *dev);
 
 /** Wake on motion detection setup. -------------------------------------------------------------- */
-void MPU6500_SetWakeOnMotionThreshold(uint8_t threshold); // LSB = 4mg
-void MPU6500_SetupWakeOnMotionDetection(FunctionalState state, bool compareWithPreviousSample);
+void MPU6500_SetWakeOnMotionThreshold(struct MPU6500_Device *dev, uint8_t threshold); // LSB = 4mg
+void MPU6500_SetupWakeOnMotionDetection(struct MPU6500_Device *dev, FunctionalState state,
+                                        bool compareWithPreviousSample);
 
 /** FIFO configuration. -------------------------------------------------------------------------- */
-void MPU6500_SetFifoState(FunctionalState state);
-uint16_t MPU6500_GetFifoCount(void);
-uint8_t MPU6500_GetFifoData(void);
+void MPU6500_SetFifoState(struct MPU6500_Device *dev, FunctionalState state);
+uint16_t MPU6500_GetFifoCount(struct MPU6500_Device *dev);
+uint8_t MPU6500_GetFifoData(struct MPU6500_Device *dev);
 
 /** Calibration and self test features. ---------------------------------------------------------- */
 #define MPU6500_SELFTEST_XG (1 << 7)
@@ -271,37 +278,38 @@ uint8_t MPU6500_GetFifoData(void);
 #define MPU6500_SELFTEST_YA (1 << 3)
 #define MPU6500_SELFTEST_ZA (1 << 2)
 
-void MPU6500_SelfTestOn(uint8_t selfTestMask);
-#define MPU6500_SelfTestOff()   MPU6500_SelfTestOn(0);
+void MPU6500_SelfTestOn(struct MPU6500_Device *dev, uint8_t selfTestMask);
+#define MPU6500_SelfTestOff(dev)    MPU6500_SelfTestOn(dev, 0);
 
-void MPU6500_GetSelfTestData(struct MPU6500_SelfTestData *selfTestData);
-void MPU6500_GetOffset(struct MPU6500_SensorData *offset);
-void MPU6500_SetOffset(const struct MPU6500_SensorData *offset);
+void MPU6500_GetSelfTestData(struct MPU6500_Device *dev, struct MPU6500_SelfTestData *selfTestData);
+void MPU6500_GetOffset(struct MPU6500_Device *dev, struct MPU6500_SensorData *offset);
+void MPU6500_SetOffset(struct MPU6500_Device *dev, const struct MPU6500_SensorData *offset);
 
 /** Auxilary I2C master interface setup and features. -------------------------------------------- */
-void MPU6500_ConfigureAuxMaster(const struct MPU6500_AuxMasterConfiguration *cfg);
-void MPU6500_SetAuxMasterState(FunctionalState state);
-void MPU6500_SetAuxBypassState(FunctionalState state);
-MPU6500_AuxMasterStatus MPU6500_GetAuxMasterStatus(void);
+void MPU6500_ConfigureAuxMaster(struct MPU6500_Device *dev, const struct MPU6500_AuxMasterConfiguration *cfg);
+void MPU6500_SetAuxMasterState(struct MPU6500_Device *dev, FunctionalState state);
+void MPU6500_SetAuxBypassState(struct MPU6500_Device *dev, FunctionalState state);
+MPU6500_AuxMasterStatus MPU6500_GetAuxMasterStatus(struct MPU6500_Device *dev);
 
 /** Auxilary I2C slaves setup and features. ------------------------------------------------------ */
-void MPU6500_ConfigureAuxSlave(enum MPU6500_AuxSlave slave, const struct MPU6500_AuxSlaveConfiguration *cfg);
-void MPU6500_SetAuxSlaveState(enum MPU6500_AuxSlave slave, FunctionalState state);
-void MPU6500_SetAuxSlaveOutData(enum MPU6500_AuxSlave slave, uint8_t data); // when transferDirection == WRITE
-void MPU6500_GetAuxSensorData(uint8_t *data, uint8_t len);
+void MPU6500_ConfigureAuxSlave(struct MPU6500_Device *dev, enum MPU6500_AuxSlave slave,
+                               const struct MPU6500_AuxSlaveConfiguration *cfg);
+void MPU6500_SetAuxSlaveState(struct MPU6500_Device *dev, enum MPU6500_AuxSlave slave, FunctionalState state);
+void MPU6500_SetAuxSlaveOutData(struct MPU6500_Device *dev, enum MPU6500_AuxSlave slave, uint8_t data); // when transferDirection == WRITE
+void MPU6500_GetAuxSensorData(struct MPU6500_Device *dev, uint8_t *data, uint8_t len);
 
-void MPU6500_ConfigureAuxSlave4(const struct MPU6500_AuxSlave4Configuration *cfg);
-void MPU6500_RequestAuxSlave4Transfer(MPU6500_AuxDirection dir,
+void MPU6500_ConfigureAuxSlave4(struct MPU6500_Device *dev, const struct MPU6500_AuxSlave4Configuration *cfg);
+void MPU6500_RequestAuxSlave4Transfer(struct MPU6500_Device *dev, MPU6500_AuxDirection dir,
         uint8_t regAddr, bool skipReg, uint8_t outData, bool intOnFinish);
-uint8_t MPU6500_GetAuxSlave4Data(void);
+uint8_t MPU6500_GetAuxSlave4Data(struct MPU6500_Device *dev);
 
 /** Reset functionality. ------------------------------------------------------------------------- */
-void MPU6500_ResetSignalPath(bool accel, bool gyro, bool temp);
-void MPU6500_ResetSensors(void);
-void MPU6500_ResetFIFO(void);
-void MPU6500_ResetPrimaryI2C(void);
-void MPU6500_ResetAuxilaryI2C(void);
-void MPU6500_ResetDMP(void);
+void MPU6500_ResetSignalPath(struct MPU6500_Device *dev, bool accel, bool gyro, bool temp);
+void MPU6500_ResetSensors(struct MPU6500_Device *dev);
+void MPU6500_ResetFIFO(struct MPU6500_Device *dev);
+void MPU6500_ResetPrimaryI2C(struct MPU6500_Device *dev);
+void MPU6500_ResetAuxilaryI2C(struct MPU6500_Device *dev);
+void MPU6500_ResetDMP(struct MPU6500_Device *dev);
 
 /* When using SPI interface, user should use PWR_MGMT_1 (register 107) as well as
  * SIGNAL_PATH_RESET (register 104) to ensure the reset is performed properly. The sequence
@@ -311,9 +319,9 @@ void MPU6500_ResetDMP(void);
  *  MPU6500_ResetSignalPath(1, 1, 1);
  *  Wait 100 ms;
  */
-void MPU6500_ResetDevice(void);
+void MPU6500_ResetDevice(struct MPU6500_Device *dev);
 
 /** DMP features (currently not supported, may be continued) */
-void MPU6500_SetDmpState(FunctionalState state);
+void MPU6500_SetDmpState(struct MPU6500_Device *dev, FunctionalState state);
 
 #endif // _INC_MPU6500_H

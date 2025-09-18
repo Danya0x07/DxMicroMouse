@@ -398,30 +398,6 @@ void Millis_Wait(uint32_t ms)
         ;
 }
 
-uint8_t SPI_TransferByte(uint8_t data)
-{
-    while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_TXE) == RESET)
-        ;
-    SPI_I2S_SendData(SPI2, data);
-    while(SPI_I2S_GetFlagStatus(SPI2, SPI_I2S_FLAG_RXNE) == RESET)
-        ;
-    return SPI_I2S_ReceiveData(SPI2);
-}
-
-void SPI_TransferBytes(uint8_t *in, const uint8_t *out, uint16_t len)
-{
-    if (in == NULL) {
-        while (len--)
-            SPI_TransferByte(*out++);
-    } else if (out == NULL) {
-        while (len--)
-            *in++ = SPI_TransferByte(0);
-    } else {
-        while (len--)
-            *in++ = SPI_TransferByte(*out++);
-    }
-}
-
 void SPI_SetSpeedToNormal(void)
 {
     SPI_InitTypeDef  SPI_InitStructure = {0};

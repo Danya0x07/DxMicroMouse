@@ -1,5 +1,4 @@
 #include "as5048.h"
-#include "as5048_port.h"
 
 // ================= Control and Error Registers ===================
 #define REG_NOP     0x0000
@@ -39,68 +38,68 @@ static uint16_t CalcEvenParity(uint16_t value){
 	return cnt & 1;
 }
 
-static uint16_t ReadRegister(AS5048_Handle h, uint16_t reg)
+static uint16_t ReadRegister(struct AS5048_Device *dev, uint16_t reg)
 {
     uint16_t msg = (1 << 14) | (reg & 0x3FFF);
     msg |= CalcEvenParity(msg) << 15;
 
-    spi_begin();
-    cs_low(h);
-    SPI_TransferByte(msg >> 8);
-    SPI_TransferByte(msg & 0xFF);
-    cs_high(h);
-    spi_end();
+    uint8_t in[2], out[2] = {msg >> 8, msg & 0xFF};
 
-    uint16_t resp;
-    spi_begin();
-    cs_low(h);
-    resp = SPI_TransferByte(0) << 8;
-    resp |= SPI_TransferByte(0);
-    cs_high(h);
-    spi_end();
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, NULL, out, 2);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, in, NULL, 2);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
+
+    uint16_t resp = (uint16_t)in[0] << 8 | in[1];
     resp &= 0x3FFF; // remove parity and error flag bits
     return resp;
 }
 
-static uint16_t WriteRegister(AS5048_Handle h, uint16_t reg, uint16_t value)
+static uint16_t WriteRegister(struct AS5048_Device *dev, uint16_t reg, uint16_t value)
 {
     uint16_t msg = reg & 0x3FFF;
     msg |= CalcEvenParity(msg) << 15;
 
+    uint8_t in[2], out[2] = {msg >> 8, msg & 0xFF};
+
     value &= 0x3FFF;
     value |= CalcEvenParity(value) << 15;
 
-    spi_begin();
-    cs_low(h);
-    SPI_TransferByte(msg >> 8);
-    SPI_TransferByte(msg & 0xFF);
-    cs_high(h);
-    spi_end();
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, NULL, out, 2);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 
-    uint16_t old;
-    spi_begin();
-    cs_low(h);
-    old = SPI_TransferByte(value >> 8) << 8;
-    old |= SPI_TransferByte(value & 0xFF);
-    cs_high(h);
-    spi_end();
+    out[0] = value >> 8;
+    out[1] = value & 0xFF;
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, in, out, 2);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 
-    uint16_t new;
-    spi_begin();
-    cs_low(h);
-    new = SPI_TransferByte(0) << 8;
-    new |= SPI_TransferByte(0);
-    cs_high(h);
-    spi_end();
+    SPI_BeginTransfer(dev->bus);
+    GPIOCTL_Low(&dev->cs);
+    SPI_TransferData(dev->bus, in, NULL, 2);
+    GPIOCTL_High(&dev->cs);
+    SPI_EndTransfer(dev->bus);
 
+    uint16_t new = (uint16_t)in[0] << 8 | in[1];
     new &= 0x3FFF; // remove parity and error flag bits
     return new;
 }
 
-union AS5048_Errors AS5048_GetErrors(AS5048_Handle h)
+union AS5048_Errors AS5048_GetErrors(struct AS5048_Device *dev)
 {
-    uint16_t data = ReadRegister(h, REG_ERROR);
+    uint16_t data = ReadRegister(dev, REG_ERROR);
 
     union AS5048_Errors errors = {
         .parity = !!(data & BIT_ERROR_PARITY),
@@ -110,37 +109,37 @@ union AS5048_Errors AS5048_GetErrors(AS5048_Handle h)
     return errors;
 }
 
-bool AS5048_BurnFuses(AS5048_Handle h)
+bool AS5048_BurnFuses(struct AS5048_Device *dev)
 {
     bool success = true;
 
-    WriteRegister(h, REG_PROGCTL, BIT_PROGEN);
-    WriteRegister(h, REG_PROGCTL, BIT_PROGEN | BIT_BURN);
-    if (ReadRegister(h, REG_ANGLE) != 0)
+    WriteRegister(dev, REG_PROGCTL, BIT_PROGEN);
+    WriteRegister(dev, REG_PROGCTL, BIT_PROGEN | BIT_BURN);
+    if (ReadRegister(dev, REG_ANGLE) != 0)
         success = false;
-    WriteRegister(h, REG_PROGCTL, BIT_PROGEN | BIT_BURN | BIT_VERIFY);
-    if (ReadRegister(h, REG_ANGLE) != 0)
+    WriteRegister(dev, REG_PROGCTL, BIT_PROGEN | BIT_BURN | BIT_VERIFY);
+    if (ReadRegister(dev, REG_ANGLE) != 0)
         success = false;
     return success;
 }
 
-uint16_t AS5048_GetZero(AS5048_Handle h)
+uint16_t AS5048_GetZero(struct AS5048_Device *dev)
 {
-    uint16_t zero = (ReadRegister(h, REG_ZEROH) & 0x00FF) << 6;
-    zero |= ReadRegister(h, REG_ZEROL) & 0x003F;
+    uint16_t zero = (ReadRegister(dev, REG_ZEROH) & 0x00FF) << 6;
+    zero |= ReadRegister(dev, REG_ZEROL) & 0x003F;
     return zero;
 }
 
-void AS5048_SetZero(AS5048_Handle h, uint16_t zero)
+void AS5048_SetZero(struct AS5048_Device *dev, uint16_t zero)
 {
     zero &= 0x3FFF;
-    WriteRegister(h, REG_ZEROH, zero >> 6);
-    WriteRegister(h, REG_ZEROL, zero & 0x003F);
+    WriteRegister(dev, REG_ZEROH, zero >> 6);
+    WriteRegister(dev, REG_ZEROL, zero & 0x003F);
 }
 
-void AS5048_GetDiagnosticsData(AS5048_Handle h, struct AS5048_DiagnosticsData *data)
+void AS5048_GetDiagnosticsData(struct AS5048_Device *dev, struct AS5048_DiagnosticsData *data)
 {
-    uint16_t value = ReadRegister(h, REG_DIAGNOSTICS);
+    uint16_t value = ReadRegister(dev, REG_DIAGNOSTICS);
 
     data->compHigh = !!(value & BIT_COMPH);
     data->compLow = !!(value & BIT_COMPL);
@@ -149,12 +148,12 @@ void AS5048_GetDiagnosticsData(AS5048_Handle h, struct AS5048_DiagnosticsData *d
     data->agc = value & 0xFF;
 }
 
-uint16_t AS5048_GetMagnitudeRaw(AS5048_Handle h)
+uint16_t AS5048_GetMagnitudeRaw(struct AS5048_Device *dev)
 {
-    return ReadRegister(h, REG_MAGNITUDE);
+    return ReadRegister(dev, REG_MAGNITUDE);
 }
 
-uint16_t AS5048_GetAngleRaw(AS5048_Handle h)
+uint16_t AS5048_GetAngleRaw(struct AS5048_Device *dev)
 {
-    return ReadRegister(h, REG_ANGLE);
+    return ReadRegister(dev, REG_ANGLE);
 }

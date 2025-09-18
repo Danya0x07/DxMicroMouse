@@ -129,8 +129,6 @@ static inline void SysTick_Reset(void)
     SysTick->CTLR = 1;
 }
 
-uint8_t SPI_TransferByte(uint8_t data);
-void SPI_TransferBytes(uint8_t *in, const uint8_t *out, uint16_t len);
 void SPI_SetSpeedToNormal(void);
 
 uint16_t ADC_Read(uint8_t ch);

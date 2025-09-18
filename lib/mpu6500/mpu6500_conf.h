@@ -7,6 +7,4 @@
 #define PACKED  __attribute__((packed))
 #endif
 
-// typedef enum {DISABLE = 0, ENABLE} FunctionalState;
-
 #endif // _INC_MPU6500_CONF_H
