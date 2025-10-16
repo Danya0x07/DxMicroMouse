@@ -217,14 +217,14 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .onComplete = _SD_OnComplete
     },
     [Maneuver_FDL45] = {
-        .motions = (const struct Motion *[]){&MOTION_LS45_1, &MOTION_LS45_2, &MOTION_FWD_C245},
+        .motions = (const struct Motion *[]){&MOTION_LS45_2, &MOTION_LS45_1, &MOTION_FWD_C245},
         .numMotions = 3,
         .onNextMotion = _FD45_OnNextMotion,
         .loop = _FD_Loop,
         .onComplete = _FD_OnComplete
     },
     [Maneuver_FDR45] = {
-        .motions = (const struct Motion *[]){&MOTION_RS45_1, &MOTION_RS45_2, &MOTION_FWD_C245},
+        .motions = (const struct Motion *[]){&MOTION_RS45_2, &MOTION_RS45_1, &MOTION_FWD_C245},
         .numMotions = 3,
         .onNextMotion = _FD45_OnNextMotion,
         .loop = _FD_Loop,
@@ -245,14 +245,14 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .onComplete = _SD_OnComplete
     },
     [Maneuver_FDL135] = {
-        .motions = (const struct Motion *[]){&MOTION_LS135_1, &MOTION_LS135_2, &MOTION_FWD_C2135},
+        .motions = (const struct Motion *[]){&MOTION_LS135_2, &MOTION_LS135_1, &MOTION_FWD_C2135},
         .numMotions = 3,
         .onNextMotion = _FD135_OnNextMotion,
         .loop = _FD_Loop,
         .onComplete = _FD_OnComplete
     },
     [Maneuver_FDR135] = {
-        .motions = (const struct Motion *[]){&MOTION_RS135_1, &MOTION_RS135_2, &MOTION_FWD_C2135},
+        .motions = (const struct Motion *[]){&MOTION_RS135_2, &MOTION_RS135_1, &MOTION_FWD_C2135},
         .numMotions = 3,
         .onNextMotion = _FD135_OnNextMotion,
         .loop = _FD_Loop,

@@ -541,9 +541,11 @@ static int ShortcutStraights(uint8_t newMnvs[], uint16_t dashes[], const uint8_t
         else {
             if (distance != 0) {
                 dashes[idx++] = distance;
+                distance = 0;
+                if (oldMnvs[i] == Maneuver_DFWD)
+                    i++;
                 if (idx > MAX_DASHES)
                     return -1;
-                distance = 0;
             }
             else {
                 newMnvs[newLen++] = oldMnvs[i];

@@ -104,11 +104,11 @@ const struct Motion
         .angleInDeg = SECONDHALF(-180)
     },
     MOTION_FWD_C245 = {
-        .distanceInMm = 26,
+        .distanceInMm = 35,
         .angleInDeg = 0
     },
     MOTION_FWD_C2135 = {
-        .distanceInMm = 79,
+        .distanceInMm = 80,
         .angleInDeg = 0
     },
     MOTION_LS45_1 = {

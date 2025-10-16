@@ -24,7 +24,7 @@ int Queue_Push(struct Queue *queue, const void *item)
 
     memcpy(queue->_writePtr, item, queue->itemSize);
     queue->_writePtr += queue->itemSize;
-    if (queue->_writePtr > (uint8_t *)queue->buffer + queue->len * queue->itemSize)
+    if (queue->_writePtr >= (uint8_t *)queue->buffer + queue->len * queue->itemSize)
         queue->_writePtr = queue->buffer;
     queue->_count++;
 
@@ -40,7 +40,7 @@ int Queue_Pop(struct Queue *queue, void *item)
 
     memcpy(item, queue->_readPtr, queue->itemSize);
     queue->_readPtr += queue->itemSize;
-    if (queue->_readPtr > (uint8_t *)queue->buffer + queue->len * queue->itemSize)
+    if (queue->_readPtr >= (uint8_t *)queue->buffer + queue->len * queue->itemSize)
         queue->_readPtr = queue->buffer;
     queue->_count--;
 

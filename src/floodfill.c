@@ -2,7 +2,7 @@
 #include "queue.h"
 
 #define DISTANCE_UNSET  0x0FFF
-#define CELL_QUEUE_LEN   200
+#define CELL_QUEUE_LEN   256
 
 static uint_fast8_t mazeN, mazeM;
 
