@@ -8,10 +8,11 @@
 #include "mcu.h"
 
 typedef enum {
-    SpeedCtlMode_STRAIGHT,
-    SpeedCtlMode_TURN,
-    SpeedCtlMode_BACKTRIM,
-    SpeedCtlMode_DIAGONAL = SpeedCtlMode_TURN
+    SpeedCtlMode_STRAIGHT = 0,
+    SpeedCtlMode_TURN = 1,
+    SpeedCtlMode_BACKTRIM = 2,
+    SpeedCtlMode_DIAGONAL = SpeedCtlMode_TURN,
+    SpeedCtlMode_FRONTTRIM = 3
 } SpeedCtlMode;
 
 void SpeedCtl_Reset(void);

@@ -28,7 +28,8 @@ void Sensors_ReadWalls(struct SensorsWalls *walls);
 bool Sensors_DetectFinger(void);
 bool Sensors_DetectTransition(void);
 
-int32_t Sensors_GetSteeringError(void);
+int32_t Sensors_GetStraightDeviation(void);
+void Sensors_GetTrimmingErrors(int32_t *transError, int32_t *rotError);
 
 extern struct SchedulerTask TASK_TmSensors;
 extern const struct ShellCommand CMD_Sensors;

@@ -22,13 +22,13 @@ static struct Regulator vTransRegulator, vRotRegulator;
 static struct {
     int32_t vTransKp, vTransKi, vTransKd;
     int32_t vRotKp, vRotKi, vRotKd;
-    int32_t coeffSensors;
+    int32_t coeffSensors, coeffTrim;
     int32_t minOutputThreshold;
     int32_t motorFeedForward;
 } params = {
     .vTransKp = 1, .vTransKi = 0, .vTransKd = 40,
     .vRotKp = 5, .vRotKi = 0, .vRotKd = 20,
-    .coeffSensors = 10,
+    .coeffSensors = 6, .coeffTrim = 40,
     .minOutputThreshold = 0,
     .motorFeedForward = 0
 };
@@ -133,19 +133,29 @@ void SpeedCtl_Update(void)
     Odometry_UpdateReckon(transInCounts, vRotInLsbs);
 
     if (mode == SpeedCtlMode_STRAIGHT && targetVTransInTpS > 0) {
-        vRotInLsbs += params.coeffSensors * Sensors_GetSteeringError();
+        vRotInLsbs += params.coeffSensors * Sensors_GetStraightDeviation();
         if (Sensors_DetectTransition()) {
             Odometry_SnapReckon();
         }
     }
 
-    targetVTransInt += targetVTransInTpS;
-    vTransInt += vTransInTpS;
-    targetVRotInt += targetVRotInLsbs;
-    vRotInt += vRotInLsbs;
+    int32_t transOutput;
+    int32_t rotOutput;
 
-    int32_t transOutput = Regulator_Output(&vTransRegulator, targetVTransInt, vTransInt) * MOTOR_PWM_MAX / 1000000;
-    int32_t rotOutput = Regulator_Output(&vRotRegulator, targetVRotInt, vRotInt) * MOTOR_PWM_MAX / 1000000;
+    if (mode != SpeedCtlMode_FRONTTRIM) {
+        targetVTransInt += targetVTransInTpS;
+        vTransInt += vTransInTpS;
+        targetVRotInt += targetVRotInLsbs;
+        vRotInt += vRotInLsbs;
+
+        transOutput = Regulator_Output(&vTransRegulator, targetVTransInt, vTransInt) * MOTOR_PWM_MAX / 1000000;
+        rotOutput = Regulator_Output(&vRotRegulator, targetVRotInt, vRotInt) * MOTOR_PWM_MAX / 1000000;
+    }
+    else {
+        Sensors_GetTrimmingErrors(&transOutput, &rotOutput);
+        transOutput *= params.coeffTrim;
+        rotOutput *= params.coeffTrim;
+    }
 
     int32_t leftOutput = transOutput - rotOutput;
     int32_t rightOutput = transOutput + rotOutput;
@@ -197,7 +207,7 @@ static int execute(int argc, char *argv[])
             return -1;
 
         unsigned mode = atoi(argv[1]);
-        if (mode > SpeedCtlMode_TURN)
+        if (mode > SpeedCtlMode_FRONTTRIM)
             return -2;
 
         SpeedCtl_SetMode((SpeedCtlMode)mode);
@@ -214,16 +224,23 @@ static int execute(int argc, char *argv[])
             return -1;
         params.coeffSensors = atoi(argv[1]);
     }
+    else if (!strcmp(argv[0], "trim")) {
+        if (argc != 2)
+            return -1;
+        params.coeffTrim = atoi(argv[1]);
+    }
     else if (!strcmp(argv[0], "tm") && argc == 2)
         telemetryMode = (enum TelemetryMode)atoi(argv[1]);
     else if (!strcmp(argv[0], "ps")) {
         printf("SpeedCtl settings:\n"
                "vTrans: %ld %ld %ld\n"
                "vRot: %ld %ld %ld\n"
-               "minThresh: %ld\tmFF: %ld\tcS: %ld\n",
+               "minThresh: %ld\tmFF: %ld\n"
+               "cS:%ld\ttrim:%ld\n",
                params.vTransKp, params.vTransKi, params.vTransKd,
                params.vRotKp, params.vRotKi, params.vRotKd,
-               params.minOutputThreshold, params.motorFeedForward, params.coeffSensors);
+               params.minOutputThreshold, params.motorFeedForward,
+               params.coeffSensors, params.coeffTrim);
     }
     else if (!strcmp(argv[0], "rst"))
         SpeedCtl_Reset();

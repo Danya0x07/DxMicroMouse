@@ -359,6 +359,13 @@ abort:
     return status;
 }
 
+void Maneuver_Trim(void)
+{
+    SpeedCtl_SetMode(SpeedCtlMode_FRONTTRIM);
+    Millis_Wait(400);
+    SpeedCtl_SetMode(SpeedCtlMode_TURN);
+}
+
 void Maneuver_Abort(void)
 {
     needToAbort = true;

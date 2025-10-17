@@ -8,7 +8,7 @@
 #include <stdlib.h>
 
 #define FINGER_THRESHOLD    950
-#define MAX_ALLOWED_ERROR   30
+#define MAX_ERROR   30
 
 typedef struct SensorsDistance SensorData;
 
@@ -23,11 +23,18 @@ static SensorData calibValue = {
     .rightFront = 6816
 };
 
+static SensorData middleValue = {
+    .leftFront = 980,
+    .leftSide = 914,
+    .rightSide = 903,
+    .rightFront = 980
+};
+
 static struct {
     int32_t left;
     int32_t front;
     int32_t right;
-} threshold = {970, 980, 970}, middle = {914, 980, 903};
+} threshold = {970, 980, 970};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
@@ -87,8 +94,8 @@ static void Update(void)
     bool leftWall = distance.leftSide <= threshold.left;
     bool rightWall = distance.rightSide <= threshold.right;
 
-    transitionDetected = walls.left && !leftWall && (middle.left - distance.leftSide <= MAX_ALLOWED_ERROR);
-    transitionDetected |= walls.right && !rightWall && (middle.right - distance.rightSide <= MAX_ALLOWED_ERROR);
+    transitionDetected = walls.left && !leftWall && (middleValue.leftSide - distance.leftSide <= MAX_ERROR);
+    transitionDetected |= walls.right && !rightWall && (middleValue.rightSide - distance.rightSide <= MAX_ERROR);
 
     walls.front = (distance.leftFront + distance.rightFront) / 2 <= threshold.front;
     walls.left = leftWall;
@@ -165,10 +172,10 @@ bool Sensors_DetectTransition(void)
     return transitionDetected;
 }
 
-int32_t Sensors_GetSteeringError(void)
+int32_t Sensors_GetStraightDeviation(void)
 {
-    int32_t leftError = middle.left - distance.leftSide;
-    int32_t rightError = distance.rightSide - middle.right;
+    int32_t leftError = middleValue.leftSide - distance.leftSide;
+    int32_t rightError = distance.rightSide - middleValue.rightSide;
 
     if (walls.left && walls.right)
         return leftError + rightError;
@@ -178,6 +185,17 @@ int32_t Sensors_GetSteeringError(void)
         return 2 * rightError;
     else
         return 0;
+}
+
+void Sensors_GetTrimmingErrors(int32_t *transError, int32_t *rotError)
+{
+    if (walls.front) {
+        *transError = distance.leftFront - middleValue.leftFront + distance.rightFront - middleValue.rightFront;
+        *rotError = middleValue.leftFront - distance.leftFront + distance.rightFront - middleValue.rightFront;
+    }
+    else {
+        *transError = *rotError = 0;
+    }
 }
 
 static void PrintTelemetry(void)
@@ -213,10 +231,11 @@ static int execute(int argc, char *argv[])
         threshold.front = atoi(argv[2]);
         threshold.right = atoi(argv[3]);
     }
-    else if (!strcmp(argv[0], "mid") && argc == 4) {
-        middle.left = atoi(argv[1]);
-        middle.front = atoi(argv[2]);
-        middle.right = atoi(argv[3]);
+    else if (!strcmp(argv[0], "mid") && argc == 5) {
+        middleValue.leftFront = atoi(argv[1]);
+        middleValue.leftSide = atoi(argv[2]);
+        middleValue.rightSide = atoi(argv[3]);
+        middleValue.rightFront = atoi(argv[4]);
     }
     else if (!strcmp(argv[0], "cal") && argc == 5) {
         calibValue.leftFront = atoi(argv[1]);
@@ -228,10 +247,10 @@ static int execute(int argc, char *argv[])
         printf("Sensors settings:\n"
                "thresh: %ld %ld %ld\n"
                "cal: %ld %ld %ld %ld\n"
-               "mid: %ld %ld %ld\n",
+               "mid: %ld %ld %ld %ld\n",
                threshold.left, threshold.front, threshold.right,
                calibValue.leftFront, calibValue.leftSide, calibValue.rightSide, calibValue.rightFront,
-               middle.left, middle.front, middle.right);
+               middleValue.leftFront, middleValue.leftSide, middleValue.rightSide, middleValue.rightFront);
     }
     else
         return -2;
@@ -245,7 +264,7 @@ static void load(const uint8_t *buffer)
     buffer += sizeof(threshold);
     memcpy(&calibValue, buffer, sizeof(calibValue));
     buffer += sizeof(calibValue);
-    memcpy(&middle, buffer, sizeof(middle));
+    memcpy(&middleValue, buffer, sizeof(middleValue));
 }
 
 static void save(uint8_t *buffer)
@@ -254,11 +273,11 @@ static void save(uint8_t *buffer)
     buffer += sizeof(threshold);
     memcpy(buffer, &calibValue, sizeof(calibValue));
     buffer += sizeof(calibValue);
-    memcpy(buffer, &middle, sizeof(middle));
+    memcpy(buffer, &middleValue, sizeof(middleValue));
 }
 
 const struct Settings SETT_Sensors = {
-    .dataSize = sizeof(threshold) + sizeof(calibValue) + sizeof(middle),
+    .dataSize = sizeof(threshold) + sizeof(calibValue) + sizeof(middleValue),
     .load = load,
     .save = save
 };

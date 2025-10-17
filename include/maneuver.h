@@ -50,6 +50,7 @@ void Maneuver_SetMode(ManeuverMode newMode);
 void Maneuver_SetupDash(int distance);
 void Maneuver_BindDisposableBacktrimCallback(void (*callback)(void));
 ManeuverStatus Maneuver_Perform(enum Maneuver maneuver, bool keepSpeed);
+void Maneuver_Trim(void);
 void Maneuver_Abort(void);
 
 extern const struct ShellCommand CMD_Maneuver;

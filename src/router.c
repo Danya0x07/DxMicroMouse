@@ -146,13 +146,19 @@ static void OnDecisionPoint(struct Pose *p)
 
     if (maneuver == Maneuver_LS90 || maneuver == Maneuver_RS90) {
         consecutiveTurns++;
-        bool haveWallToTrim = (maneuver == Maneuver_LS90 && Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_RIGHT))
-                           || (maneuver == Maneuver_RS90 && Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_LEFT));
+        bool haveFrontWall = Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_UP);
+        bool haveSideWall = (maneuver == Maneuver_LS90 && Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_RIGHT))
+                         || (maneuver == Maneuver_RS90 && Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_LEFT));
 
-        if (consecutiveTurns > MAX_CONSECUTIVE_TURNS && haveWallToTrim) {
+        if (consecutiveTurns > MAX_CONSECUTIVE_TURNS && (haveFrontWall || haveSideWall)) {
             maneuverStatus = Maneuver_Perform(Maneuver_HFWD, 0);
+            if (haveFrontWall) {
+                Maneuver_Trim();
+            }
             maneuverStatus |= Maneuver_Perform(maneuver == Maneuver_LS90 ? Maneuver_LP90 : Maneuver_RP90, 0);
-            maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
+            if (haveSideWall) {
+                maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
+            }
             consecutiveTurns = 0;
         }
         else {
