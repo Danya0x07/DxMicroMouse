@@ -29,6 +29,7 @@ bool Sensors_DetectFinger(void);
 bool Sensors_DetectTransition(void);
 
 int32_t Sensors_GetStraightDeviation(void);
+int32_t Sensors_GetDiagonalDeviation(void);
 void Sensors_GetTrimmingErrors(int32_t *transError, int32_t *rotError);
 
 extern struct SchedulerTask TASK_TmSensors;

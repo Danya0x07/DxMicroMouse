@@ -36,6 +36,11 @@ static struct {
     int32_t right;
 } threshold = {970, 980, 970};
 
+static struct {
+    int32_t left;
+    int32_t right;
+} diagonalMiddleMinimum = {900, 900};
+
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
     TelemetryMode_WALLS
@@ -187,6 +192,16 @@ int32_t Sensors_GetStraightDeviation(void)
         return 0;
 }
 
+int32_t Sensors_GetDiagonalDeviation(void)
+{
+    if (distance.leftFront < diagonalMiddleMinimum.left)
+        return diagonalMiddleMinimum.left - distance.leftFront;
+    else if (distance.rightFront < diagonalMiddleMinimum.right)
+        return distance.rightFront - diagonalMiddleMinimum.right;
+    else
+        return 0;
+}
+
 void Sensors_GetTrimmingErrors(int32_t *transError, int32_t *rotError)
 {
     if (walls.front) {
@@ -243,14 +258,20 @@ static int execute(int argc, char *argv[])
         calibValue.rightSide = atoi(argv[3]);
         calibValue.rightFront = atoi(argv[4]);
     }
+    else if (!strcmp(argv[0], "dmm") && argc == 3) {
+        diagonalMiddleMinimum.left = atoi(argv[1]);
+        diagonalMiddleMinimum.right = atoi(argv[2]);
+    }
     else if (!strcmp(argv[0], "ps")) {
         printf("Sensors settings:\n"
                "thresh: %ld %ld %ld\n"
                "cal: %ld %ld %ld %ld\n"
-               "mid: %ld %ld %ld %ld\n",
+               "mid: %ld %ld %ld %ld\n"
+               "dmm: %ld %ld\n",
                threshold.left, threshold.front, threshold.right,
                calibValue.leftFront, calibValue.leftSide, calibValue.rightSide, calibValue.rightFront,
-               middleValue.leftFront, middleValue.leftSide, middleValue.rightSide, middleValue.rightFront);
+               middleValue.leftFront, middleValue.leftSide, middleValue.rightSide, middleValue.rightFront,
+               diagonalMiddleMinimum.left, diagonalMiddleMinimum.right);
     }
     else
         return -2;
@@ -265,6 +286,8 @@ static void load(const uint8_t *buffer)
     memcpy(&calibValue, buffer, sizeof(calibValue));
     buffer += sizeof(calibValue);
     memcpy(&middleValue, buffer, sizeof(middleValue));
+    buffer += sizeof(middleValue);
+    memcpy(&diagonalMiddleMinimum, buffer, sizeof(diagonalMiddleMinimum));
 }
 
 static void save(uint8_t *buffer)
@@ -274,10 +297,12 @@ static void save(uint8_t *buffer)
     memcpy(buffer, &calibValue, sizeof(calibValue));
     buffer += sizeof(calibValue);
     memcpy(buffer, &middleValue, sizeof(middleValue));
+    buffer += sizeof(middleValue);
+    memcpy(buffer, &diagonalMiddleMinimum, sizeof(diagonalMiddleMinimum));
 }
 
 const struct Settings SETT_Sensors = {
-    .dataSize = sizeof(threshold) + sizeof(calibValue) + sizeof(middleValue),
+    .dataSize = sizeof(threshold) + sizeof(calibValue) + sizeof(middleValue) + sizeof(diagonalMiddleMinimum),
     .load = load,
     .save = save
 };
@@ -288,6 +313,6 @@ struct SchedulerTask TASK_TmSensors = {
 };
 
 const struct ShellCommand CMD_Sensors = {
-    .name = "sensors",
+    .name = "sens",
     .execute = execute,
 };

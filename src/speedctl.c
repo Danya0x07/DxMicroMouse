@@ -22,15 +22,13 @@ static struct Regulator vTransRegulator, vRotRegulator;
 static struct {
     int32_t vTransKp, vTransKi, vTransKd;
     int32_t vRotKp, vRotKi, vRotKd;
-    int32_t coeffSensors, coeffTrim;
-    int32_t minOutputThreshold;
-    int32_t motorFeedForward;
+    int32_t coeffSensors, coeffTrim, coeffDiag;
+    int32_t minOutputThreshold, motorFeedForward;
 } params = {
     .vTransKp = 1, .vTransKi = 0, .vTransKd = 40,
     .vRotKp = 5, .vRotKi = 0, .vRotKd = 20,
-    .coeffSensors = 6, .coeffTrim = 40,
-    .minOutputThreshold = 0,
-    .motorFeedForward = 0
+    .coeffSensors = 6, .coeffTrim = 40, .coeffDiag = 50,
+    .minOutputThreshold = 0, .motorFeedForward = 0
 };
 
 static enum TelemetryMode {
@@ -138,6 +136,9 @@ void SpeedCtl_Update(void)
             Odometry_SnapReckon();
         }
     }
+    else if (mode == SpeedCtlMode_DIAGONAL) {
+        vRotInLsbs += params.coeffDiag * Sensors_GetDiagonalDeviation();
+    }
 
     int32_t transOutput;
     int32_t rotOutput;
@@ -229,6 +230,11 @@ static int execute(int argc, char *argv[])
             return -1;
         params.coeffTrim = atoi(argv[1]);
     }
+    else if (!strcmp(argv[0], "diag")) {
+        if (argc != 2)
+            return -1;
+        params.coeffDiag = atoi(argv[1]);
+    }
     else if (!strcmp(argv[0], "tm") && argc == 2)
         telemetryMode = (enum TelemetryMode)atoi(argv[1]);
     else if (!strcmp(argv[0], "ps")) {
@@ -236,11 +242,11 @@ static int execute(int argc, char *argv[])
                "vTrans: %ld %ld %ld\n"
                "vRot: %ld %ld %ld\n"
                "minThresh: %ld\tmFF: %ld\n"
-               "cS:%ld\ttrim:%ld\n",
+               "cS:%ld\ttrim:%ld\tdiag:%ld\n",
                params.vTransKp, params.vTransKi, params.vTransKd,
                params.vRotKp, params.vRotKi, params.vRotKd,
                params.minOutputThreshold, params.motorFeedForward,
-               params.coeffSensors, params.coeffTrim);
+               params.coeffSensors, params.coeffTrim, params.coeffDiag);
     }
     else if (!strcmp(argv[0], "rst"))
         SpeedCtl_Reset();
