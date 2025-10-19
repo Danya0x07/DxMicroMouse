@@ -159,6 +159,9 @@ static void OnDecisionPoint(struct Pose *p)
             if (haveSideWall) {
                 maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
             }
+            else {
+                maneuverStatus |= Maneuver_Perform(Maneuver_HFWD, 1);
+            }
             consecutiveTurns = 0;
         }
         else {
@@ -346,8 +349,12 @@ typedef enum {
     DiagonalizerState_DL45V2,
     DiagonalizerState_DR45V1,
     DiagonalizerState_DR45V2,
-    DiagonalizerState_DL135,
-    DiagonalizerState_DR135
+    DiagonalizerState_DL135V1,
+    DiagonalizerState_DL135V2,
+    DiagonalizerState_DR135V1,
+    DiagonalizerState_DR135V2,
+    DiagonalizerState_D2DL,
+    DiagonalizerState_D2DR
 } DiagonalizerState;
 
 static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState *state, uint8_t nextOldMnv)
@@ -371,41 +378,21 @@ static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState 
 
         case DiagonalizerState_S2:
             if (nextOldMnv == Maneuver_FWD) {
-                static bool alreadySkipped = false;
-
                 if (newMnvs[idx - 1] == Maneuver_BTR2C) {
                     newMnvs[idx - 1] = Maneuver_BTR2M;
-                    *state = DiagonalizerState_S1;
-                }
-                else if ((newMnvs[idx - 1] == Maneuver_FDL135 || newMnvs[idx - 1] == Maneuver_FDR135)
-                         && !alreadySkipped) {
-                    alreadySkipped = true;
                 }
                 else {
                     newMnvs[idx++] = Maneuver_HFWD;
-                    *state = DiagonalizerState_S1;
-                    alreadySkipped = false;
                 }
+                *state = DiagonalizerState_S1;
             }
             else if (nextOldMnv == Maneuver_LS90) {
-                if (newMnvs[idx - 1] == Maneuver_FDR135) {
-                    newMnvs[idx-- - 2] = Maneuver_D2DR;
-                    *state = DiagonalizerState_DL45V1;
-                }
-                else {
-                    newMnvs[idx++] = Maneuver_SDL45;
-                    *state = DiagonalizerState_DL45V1;
-                }
+                newMnvs[idx++] = Maneuver_SDL45;
+                *state = DiagonalizerState_DL45V1;
             }
             else if (nextOldMnv == Maneuver_RS90) {
-                if (newMnvs[idx - 1] == Maneuver_FDL135) {
-                    newMnvs[idx-- - 2] = Maneuver_D2DL;
-                    *state = DiagonalizerState_DR45V1;
-                }
-                else {
-                    newMnvs[idx++] = Maneuver_SDR45;
-                    *state = DiagonalizerState_DR45V1;
-                }
+                newMnvs[idx++] = Maneuver_SDR45;
+                *state = DiagonalizerState_DR45V1;
             }
             break;
 
@@ -416,7 +403,7 @@ static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState 
             }
             else if (nextOldMnv == Maneuver_LS90) {
                 newMnvs[idx - 1] = Maneuver_SDL135;
-                *state = DiagonalizerState_DL135;
+                *state = DiagonalizerState_DL135V1;
             }
             else if (nextOldMnv == Maneuver_RS90) {
                 newMnvs[idx++] = Maneuver_DFWD;
@@ -434,8 +421,14 @@ static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState 
                 *state = DiagonalizerState_DL45V1;
             }
             else if (nextOldMnv == Maneuver_RS90) {
-                newMnvs[idx++] = Maneuver_FDR135;
-                *state = DiagonalizerState_S2;
+                if (newMnvs[idx - 2] == Maneuver_D2DL) {
+                    newMnvs[idx - 1] = Maneuver_D2DR;
+                }
+                else {
+                    newMnvs[idx - 1] = Maneuver_D2W;
+                    newMnvs[idx++] = Maneuver_D2DR;
+                }
+                *state = DiagonalizerState_D2DR;
             }
             break;
 
@@ -450,7 +443,7 @@ static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState 
             }
             else if (nextOldMnv == Maneuver_RS90) {
                 newMnvs[idx - 1] = Maneuver_SDR135;
-                *state = DiagonalizerState_DR135;
+                *state = DiagonalizerState_DR135V1;
             }
             break;
 
@@ -460,8 +453,14 @@ static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState 
                 *state = DiagonalizerState_S2;
             }
             else if (nextOldMnv == Maneuver_LS90) {
-                newMnvs[idx++] = Maneuver_FDL135;
-                *state = DiagonalizerState_S2;
+                if (newMnvs[idx - 2] == Maneuver_D2DR) {
+                    newMnvs[idx - 1] = Maneuver_D2DL;
+                }
+                else {
+                    newMnvs[idx - 1] = Maneuver_D2W;
+                    newMnvs[idx++] = Maneuver_D2DL;
+                }
+                *state = DiagonalizerState_D2DL;
             }
             else if (nextOldMnv == Maneuver_RS90) {
                 newMnvs[idx++] = Maneuver_DFWD;
@@ -469,26 +468,128 @@ static int AppendDiagonalManeuver(uint8_t newMnvs[], int idx, DiagonalizerState 
             }
             break;
 
-        case DiagonalizerState_DL135:
+        case DiagonalizerState_DL135V1:
             if (nextOldMnv == Maneuver_FWD) {
-                newMnvs[idx - 2] = newMnvs[idx - 2] == Maneuver_HFWD ? Maneuver_FWD : Maneuver_BTR2M;
-                newMnvs[idx - 1] = Maneuver_LS180;
-                *state = DiagonalizerState_S1;
+                if (newMnvs[idx - 1] == Maneuver_DFWD) {
+                    newMnvs[idx++] = Maneuver_FDL45;
+                    *state = DiagonalizerState_S2;
+                }
+                else {
+                    if (newMnvs[idx - 2] == Maneuver_HFWD) {
+                        newMnvs[idx - 2] = Maneuver_FWD;
+                        newMnvs[idx - 1] = Maneuver_LS180;
+                    }
+                    else {
+                        newMnvs[idx - 1] = Maneuver_HFWD;
+                        newMnvs[idx++] = Maneuver_LS180;
+                    }
+                    *state = DiagonalizerState_S1;
+                }
+            }
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx - 1] = Maneuver_D2W;
+                newMnvs[idx++] = Maneuver_D2DL;
+                *state = DiagonalizerState_D2DL;
             }
             else if (nextOldMnv == Maneuver_RS90) {
                 newMnvs[idx++] = Maneuver_DFWD;
+                *state = DiagonalizerState_DL135V2;
+            }
+            break;
+
+        case DiagonalizerState_DL135V2:
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FDR45;
+                *state = DiagonalizerState_S2;
+            }
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
+                *state = DiagonalizerState_DL135V1;
+            }
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx - 1] = Maneuver_D2W;
+                newMnvs[idx++] = Maneuver_D2DR;
+                *state = DiagonalizerState_D2DR;
+            }
+            break;
+
+        case DiagonalizerState_DR135V1:
+            if (nextOldMnv == Maneuver_FWD) {
+                if (newMnvs[idx - 1] == Maneuver_DFWD) {
+                    newMnvs[idx++] = Maneuver_FDR45;
+                    *state = DiagonalizerState_S2;
+                }
+                else {
+                    if (newMnvs[idx - 2] == Maneuver_HFWD) {
+                        newMnvs[idx - 2] = Maneuver_FWD;
+                        newMnvs[idx - 1] = Maneuver_RS180;
+                    }
+                    else {
+                        newMnvs[idx - 1] = Maneuver_HFWD;
+                        newMnvs[idx++] = Maneuver_RS180;
+                    }
+                    *state = DiagonalizerState_S1;
+                }
+            }
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
+                *state = DiagonalizerState_DR135V2;
+            }
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx - 1] = Maneuver_D2W;
+                newMnvs[idx++] = Maneuver_D2DR;
+                *state = DiagonalizerState_D2DR;
+            }
+            break;
+
+        case DiagonalizerState_DR135V2:
+            if (nextOldMnv == Maneuver_FWD) {
+                newMnvs[idx++] = Maneuver_FDL45;
+                *state = DiagonalizerState_S2;
+            }
+            else if (nextOldMnv == Maneuver_LS90) {
+                newMnvs[idx - 1] = Maneuver_D2W;
+                newMnvs[idx++] = Maneuver_D2DL;
+                *state = DiagonalizerState_D2DL;
+            }
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_DFWD;
+                *state = DiagonalizerState_DR135V1;
+            }
+            break;
+
+        case DiagonalizerState_D2DL:
+            if (nextOldMnv == Maneuver_FWD) {
+                if (newMnvs[idx - 2] == Maneuver_D2DR) {
+                    newMnvs[idx - 1] = Maneuver_D2W;
+                    newMnvs[idx++] = Maneuver_FDL135;
+                }
+                else {
+                    newMnvs[idx - 2] = Maneuver_DFWD;
+                    newMnvs[idx - 1] = Maneuver_FDL135;
+                }
+                *state = DiagonalizerState_S2;
+            }
+            else if (nextOldMnv == Maneuver_RS90) {
+                newMnvs[idx++] = Maneuver_D2W;
                 *state = DiagonalizerState_DL45V2;
             }
             break;
 
-        case DiagonalizerState_DR135:
+        case DiagonalizerState_D2DR:
             if (nextOldMnv == Maneuver_FWD) {
-                newMnvs[idx - 2] = newMnvs[idx - 2] == Maneuver_HFWD ? Maneuver_FWD : Maneuver_BTR2M;
-                newMnvs[idx - 1] = Maneuver_RS180;
-                *state = DiagonalizerState_S1;
+                if (newMnvs[idx - 2] == Maneuver_D2DL) {
+                    newMnvs[idx - 1] = Maneuver_D2W;
+                    newMnvs[idx++] = Maneuver_FDR135;
+                }
+                else {
+                    newMnvs[idx - 2] = Maneuver_DFWD;
+                    newMnvs[idx - 1] = Maneuver_FDR135;
+                }
+                *state = DiagonalizerState_S2;
             }
             else if (nextOldMnv == Maneuver_LS90) {
-                newMnvs[idx++] = Maneuver_DFWD;
+                newMnvs[idx++] = Maneuver_D2W;
                 *state = DiagonalizerState_DR45V2;
             }
             break;

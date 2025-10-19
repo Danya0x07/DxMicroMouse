@@ -32,6 +32,7 @@ enum Maneuver {
     Maneuver_SDR135,
     Maneuver_FDL135,
     Maneuver_FDR135,
+    Maneuver_D2W,
     Maneuver_D2DL,
     Maneuver_D2DR,
 

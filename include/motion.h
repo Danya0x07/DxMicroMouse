@@ -48,6 +48,7 @@ extern const struct Motion
     MOTION_RS135_1,
     MOTION_RS135_2,
     MOTION_DFWD,
+    MOTION_D2W,
     MOTION_DFWD_D2D,
     MOTION_LS90_D2D_1,
     MOTION_LS90_D2D_2,

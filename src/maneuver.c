@@ -78,6 +78,7 @@ static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
 
 #define _TP90_OnNextMotion  _TBACK_OnNextMotion
 #define _SD_OnNextMotion    _TS90_OnNextMotion
+#define _D2W_OnNextMotion   _FWD_OnNextMotion
 
 /* ========== Maneuver-specific loop callbacks ========== */
 #define _BTR_Loop   _Generic_Loop
@@ -88,6 +89,7 @@ static Speeds _DASH_OnNextMotion(unsigned idx, struct Motion *m, bool keepSpeed)
 #define _TBACK_Loop  _Generic_Loop
 #define _SD_Loop    _Generic_Loop
 #define _FD_Loop    _Generic_Loop
+#define _D2W_Loop   _Generic_Loop
 #define _D2D_Loop   _Generic_Loop
 #define _DASH_Loop  _Generic_Loop
 
@@ -101,6 +103,7 @@ static void _TS180_OnComplete(ManeuverStatus status);
 static void _TBACK_OnComplete(ManeuverStatus status);
 static void _SD_OnComplete(ManeuverStatus status);
 //~ static void _FD_OnComplete(ManeuverStatus status);
+static void _D2W_OnComplete(ManeuverStatus status);
 //~ static void _D2D_OnComplete(ManeuverStatus status);
 //~ static void _DASH_OnComplete(ManeuverStatus status);
 
@@ -258,6 +261,13 @@ static const struct ManeuverCtlBlock maneuvers[] = {
         .loop = _FD_Loop,
         .onComplete = _FD_OnComplete
     },
+    [Maneuver_D2W] = {
+        .motions = (const struct Motion *[]){&MOTION_D2W},
+        .numMotions = 1,
+        .onNextMotion = _D2W_OnNextMotion,
+        .loop = _D2W_Loop,
+        .onComplete = _D2W_OnComplete
+    },
     [Maneuver_D2DL] = {
         .motions = (const struct Motion *[]) {
             &MOTION_DFWD_D2D, &MOTION_LS90_D2D_1, &MOTION_LS90_D2D_2, &MOTION_DFWD_D2D
@@ -307,6 +317,7 @@ const char *const MANEUVERS_STR[] = {
     [Maneuver_SDR135] = "SDR135",
     [Maneuver_FDL135] = "FDL135",
     [Maneuver_FDR135] = "FDR135",
+    [Maneuver_D2W] = "D2W",
     [Maneuver_D2DL] = "D2DL",
     [Maneuver_D2DR] = "D2DR",
     [Maneuver_DASH] = "DASH"
@@ -362,7 +373,7 @@ abort:
 void Maneuver_Trim(void)
 {
     SpeedCtl_SetMode(SpeedCtlMode_FRONTTRIM);
-    Millis_Wait(400);
+    Millis_Wait(300);
     SpeedCtl_SetMode(SpeedCtlMode_TURN);
 }
 
@@ -620,6 +631,12 @@ static void _SD_OnComplete(ManeuverStatus status)
 {
     _Generic_OnComplete(status);
     SpeedCtl_SetMode(SpeedCtlMode_DIAGONAL);
+}
+
+static void _D2W_OnComplete(ManeuverStatus status)
+{
+    (void)status;
+    UpdateDistanceError(MOTION_D2W.distanceInMm);
 }
 
 /* ========== Module service things ========== */
