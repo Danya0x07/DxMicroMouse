@@ -172,7 +172,10 @@ static void OnDecisionPoint(struct Pose *p)
         consecutiveTurns = 0;
         maneuverStatus = Maneuver_Perform(Maneuver_HFWD, 0);
         maneuverStatus |= Maneuver_Perform(Maneuver_TBACK, 0);
-        maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
+        if (Maze_CellHasWallOnSide(&p->cell, p->direction, MAZE_UP))
+            maneuverStatus |= Maneuver_Perform(Maneuver_BTR2M, 1);
+        else
+            maneuverStatus = Maneuver_Perform(Maneuver_HFWD, 1);
     }
     else {
         consecutiveTurns = 0;
@@ -618,8 +621,6 @@ static int DiagonalizeRoute(uint8_t newMnvs[], const uint8_t oldMnvs[], unsigned
     int newLen = 1;
 
     for (int i = 1; i < oldLen - 2; i++) {
-        if (newLen > i)
-            return -1;
         newLen = AppendDiagonalManeuver(newMnvs, newLen, &state, oldMnvs[i]);
     }
     newLen = AppendDiagonalManeuver(newMnvs, newLen, &state, Maneuver_FWD);

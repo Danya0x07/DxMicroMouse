@@ -39,7 +39,7 @@ static struct {
 static struct {
     int32_t left;
     int32_t right;
-} diagonalMiddleMinimum = {900, 900};
+} diagonalMiddleMinimum = {970, 970};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,

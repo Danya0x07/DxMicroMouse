@@ -148,27 +148,27 @@ const struct Motion
         .angleInDeg = 0
     },
     MOTION_D2W = {
-        .distanceInMm = 64,
+        .distanceInMm = 70,
         .angleInDeg = 0
     },
     MOTION_DFWD_D2D = {
-        .distanceInMm = 19,
+        .distanceInMm = 25,
         .angleInDeg = 0
     },
     MOTION_LS90_D2D_1 = {
-        .distanceInMm = FIRSTHALF(171),
+        .distanceInMm = FIRSTHALF(180),
         .angleInDeg = FIRSTHALF(90)
     },
     MOTION_LS90_D2D_2 = {
-        .distanceInMm = SECONDHALF(171),
+        .distanceInMm = SECONDHALF(180),
         .angleInDeg = SECONDHALF(90)
     },
     MOTION_RS90_D2D_1 = {
-        .distanceInMm = FIRSTHALF(171),
+        .distanceInMm = FIRSTHALF(180),
         .angleInDeg = FIRSTHALF(-90)
     },
     MOTION_RS90_D2D_2 = {
-        .distanceInMm = SECONDHALF(171),
+        .distanceInMm = SECONDHALF(180),
         .angleInDeg = SECONDHALF(-90)
     }
 ;
