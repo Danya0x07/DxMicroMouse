@@ -776,7 +776,7 @@ void Router_EraseMaze(void)
 
 static int execute(int argc, char *argv[])
 {
-    if (!strcmp(argv[0], "newmaze") && argc == 3) {
+    if (!strcmp(argv[0], "new") && argc == 3) {
         unsigned mazeN = atoi(argv[1]);
         unsigned mazeM = atoi(argv[2]);
 
@@ -788,7 +788,7 @@ static int execute(int argc, char *argv[])
         else
             return -2;
     }
-    else if (!strcmp(argv[0], "setstart") && argc == 4) {
+    else if (!strcmp(argv[0], "start") && argc == 4) {
         unsigned x = atoi(argv[1]);
         unsigned y = atoi(argv[2]);
         unsigned d = atoi(argv[3]) & 3;
@@ -801,7 +801,7 @@ static int execute(int argc, char *argv[])
         else
             return -2;
     }
-    else if (!strcmp(argv[0], "setgoal") && argc == 4) {
+    else if (!strcmp(argv[0], "goal") && argc == 4) {
         unsigned x = atoi(argv[1]);
         unsigned y = atoi(argv[2]);
         unsigned e = atoi(argv[3]) & 1;

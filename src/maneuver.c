@@ -33,8 +33,8 @@ static struct ManeuverConfig {
             .aTrans = 3000,
             .aRot = 6000
         },
-        .vTransTurn = 360,
-        .vTransDash = 400,
+        .vTransTurn = 400,
+        .vTransDash = 500,
         .vRot = 720
     },
     [ManeuverMode_FAST] = {
@@ -42,8 +42,8 @@ static struct ManeuverConfig {
             .aTrans = 4000,
             .aRot = 8000
         },
-        .vTransTurn = 400,
-        .vTransDash = 700,
+        .vTransTurn = 600,
+        .vTransDash = 1200,
         .vRot = 1080
     }
 };
