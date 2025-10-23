@@ -27,7 +27,7 @@ static struct {
 } params = {
     .vTransKp = 1, .vTransKi = 0, .vTransKd = 40,
     .vRotKp = 5, .vRotKi = 0, .vRotKd = 20,
-    .coeffSensors = 6, .coeffTrim = 40, .coeffDiag = 40,
+    .coeffSensors = 6, .coeffTrim = 40, .coeffDiag = 70,
     .minOutputThreshold = 0, .motorFeedForward = 0
 };
 

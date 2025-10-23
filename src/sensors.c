@@ -34,12 +34,12 @@ static struct {
     int32_t left;
     int32_t front;
     int32_t right;
-} threshold = {970, 980, 970};
+} threshold = {980, 990, 980};
 
 static struct {
     int32_t left;
     int32_t right;
-} diagonalMiddleMinimum = {970, 970};
+} diagonalMiddleMinimum = {1000, 1000};
 
 static enum TelemetryMode {
     TelemetryMode_DISTANCES,
