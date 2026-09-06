@@ -1,0 +1,52 @@
+<mxfile host="65bd71144e">
+    <diagram id="IK9MIgbGzZo7FzBIiItP" name="Page-1">
+        <mxGraphModel dx="697" dy="539" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="22" value="&lt;pre&gt;1 kHz SysTick ISR&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="1">
+                    <mxGeometry x="240" y="460" width="380" height="100" as="geometry"/>
+                </mxCell>
+                <mxCell id="13" value="&lt;pre&gt;CH32V NoneOs SDK&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="240" y="690" width="380" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="14" value="" style="group" vertex="1" connectable="0" parent="1">
+                    <mxGeometry x="240" y="570" width="380" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="4" value="&lt;pre&gt;Drivers&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;verticalAlign=top;" vertex="1" parent="14">
+                    <mxGeometry width="380" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="&lt;pre&gt;Motors&lt;br&gt;(PWM)&lt;/pre&gt;" style="rounded=0;whiteSpace=wrap;html=1;gradientColor=none;" vertex="1" parent="14">
+                    <mxGeometry x="20" y="50" width="70" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="8" value="&lt;pre&gt;Sensors&lt;br&gt;(ADC)&lt;/pre&gt;" style="rounded=0;whiteSpace=wrap;html=1;gradientColor=none;" vertex="1" parent="14">
+                    <mxGeometry x="110" y="50" width="70" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="9" value="&lt;pre&gt;IMU&lt;br&gt;(SPI)&lt;/pre&gt;" style="rounded=0;whiteSpace=wrap;html=1;gradientColor=none;" vertex="1" parent="14">
+                    <mxGeometry x="200" y="50" width="70" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="&lt;pre&gt;Encoders&lt;br&gt;(SPI)&lt;/pre&gt;" style="rounded=0;whiteSpace=wrap;html=1;gradientColor=none;" vertex="1" parent="14">
+                    <mxGeometry x="290" y="50" width="70" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="16" value="&lt;pre&gt;(Read/Calc/Update)&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="260" y="510" width="170" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="18" value="&lt;pre&gt;Speed profile generation&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="240" y="410" width="380" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="19" value="&lt;pre style=&quot;scrollbar-color: rgb(75, 75, 75) rgb(27, 29, 30);&quot;&gt;Speed Control Loop&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontColor=default;" vertex="1" parent="1">
+                    <mxGeometry x="445" y="510" width="160" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="23" value="&lt;pre&gt;Maneuvers execution flow:&lt;br&gt;Motion sequences, callbacks&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="240" y="350" width="380" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="24" value="&lt;pre&gt;Router module: maze solver + maneuver planner&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="240" y="300" width="380" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="25" value="&lt;pre&gt;Mode selection, task launching&lt;/pre&gt;" style="rounded=1;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+                    <mxGeometry x="240" y="250" width="380" height="40" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
